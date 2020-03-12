@@ -1,0 +1,10 @@
+fileFormatVersion: 2
+guid: b42539de34cfe8f46825ea8964be3795
+timeCreated: 1518388113
+licenseType: Pro
+ShaderImporter:
+  defaultTextures:
+  - _SpriteSheet: {fileID: 2800000, guid: 90bcd3242f8469747ac64ac8d4c19e22, type: 3}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

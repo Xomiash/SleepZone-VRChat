@@ -1,0 +1,12 @@
+# Blender MTL File: 'Pillow_1.blend'
+# Material Count: 1
+
+newmtl Pillow_1
+Ns 552.249997
+Ka 0.083333 0.083333 0.083333
+Kd 0.800000 0.800000 0.800000
+Ks 0.825000 0.825000 0.825000
+Ke 0.0 0.0 0.0
+Ni 1.450000
+d 1.000000
+illum 3

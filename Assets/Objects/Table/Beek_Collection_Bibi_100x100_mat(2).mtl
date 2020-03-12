@@ -1,0 +1,70 @@
+# 3ds Max Wavefront OBJ Exporter v0.97b - (c)2007 guruware
+# File Created: 09.06.2017 14:39:46
+
+newmtl Beek_Collection_Bibi_100x100_mat2_mtl_1
+	Ns 10.0000
+	Ni 1.5000
+	d 0.1059
+	Tr 0.8941
+	Tf 0.1059 0.1059 0.1059 
+	illum 2
+	Ka 0.5880 0.5880 0.5880
+	Kd 0.0941 0.3608 0.3647
+	Ks 0.0000 0.0000 0.0000
+	Ke 0.0000 0.0000 0.0000
+
+newmtl Beek_Collection_Bibi_100x100_mat2_mtl_2
+	Ns 10.0000
+	Ni 1.5000
+	d 1.0000
+	Tr 0.0000
+	Tf 1.0000 1.0000 1.0000 
+	illum 2
+	Ka 0.5880 0.5880 0.5880
+	Kd 0.5000 0.5000 0.5000
+	Ks 0.0000 0.0000 0.0000
+	Ke 0.0000 0.0000 0.0000
+	map_Ka dcmap_Beek Collection_Bibi Coffee Table_diff(1).jpg
+	map_Kd dcmap_Beek Collection_Bibi Coffee Table_diff(1).jpg
+	map_bump dcmap_Beek Collection_Bibi Coffee Table_bump(1).jpg
+	bump dcmap_Beek Collection_Bibi Coffee Table_bump(1).jpg
+
+newmtl Beek_Collection_Bibi_100x100_mat2_mtl_3
+	Ns 10.0000
+	Ni 1.5000
+	d 1.0000
+	Tr 0.0000
+	Tf 1.0000 1.0000 1.0000 
+	illum 2
+	Ka 0.5880 0.5880 0.5880
+	Kd 0.0000 0.0000 0.0000
+	Ks 0.0000 0.0000 0.0000
+	Ke 0.0000 0.0000 0.0000
+
+newmtl Beek_Collection_Bibi_100x100_mat2_mtl_4
+	Ns 10.0000
+	Ni 1.5000
+	d 1.0000
+	Tr 0.0000
+	Tf 1.0000 1.0000 1.0000 
+	illum 2
+	Ka 0.5880 0.5880 0.5880
+	Kd 0.0000 0.0000 0.0000
+	Ks 0.0000 0.0000 0.0000
+	Ke 0.0000 0.0000 0.0000
+
+newmtl Beek_Collection_Bibi_100x100_mat2_mtl_5
+	Ns 10.0000
+	Ni 1.5000
+	d 1.0000
+	Tr 0.0000
+	Tf 1.0000 1.0000 1.0000 
+	illum 2
+	Ka 0.5880 0.5880 0.5880
+	Kd 0.5000 0.5000 0.5000
+	Ks 0.0000 0.0000 0.0000
+	Ke 0.0000 0.0000 0.0000
+	map_Ka dcmap_Beek Collection_Bibi Coffee Table_diff(1).jpg
+	map_Kd dcmap_Beek Collection_Bibi Coffee Table_diff(1).jpg
+	map_bump dcmap_Beek Collection_Bibi Coffee Table_bump(1).jpg
+	bump dcmap_Beek Collection_Bibi Coffee Table_bump(1).jpg

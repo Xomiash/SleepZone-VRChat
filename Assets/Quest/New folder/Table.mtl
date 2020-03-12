@@ -1,0 +1,14 @@
+newmtl Default_Prototype
+map_Kd GridBox_Default.png
+Kd 1 1 1
+d 1
+
+newmtl Glass
+Kd 0.7607843 0.7607843 0.7607843
+d 0.222
+
+newmtl dcmap_Beek_Collection_Bibi_Coffee_Table_diff
+map_Kd dcmap_Beek Collection_Bibi Coffee Table_diff.jpg
+Kd 1 1 1
+d 1
+
