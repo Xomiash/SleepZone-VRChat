@@ -7,6 +7,7 @@ using VRC.Core;
 
 namespace VRCSDK2
 {
+#if UNITY_EDITOR
     public class RuntimeBlueprintCreation : RuntimeAPICreation
     {
         public GameObject waitingPanel;
@@ -31,7 +32,6 @@ namespace VRCSDK2
 
         private ApiAvatar apiAvatar;
 
-#if UNITY_EDITOR
         new void Start()
         {
             if (!Application.isEditor || !Application.isPlaying)
@@ -39,7 +39,7 @@ namespace VRCSDK2
 
             base.Start();
 
-            var desc = pipelineManager.GetComponent<VRC_AvatarDescriptor>();
+            var desc = pipelineManager.GetComponent<VRC.SDKBase.VRC_AvatarDescriptor>();
             desc.PositionPortraitCamera(imageCapture.shotCamera.transform);
 
             Application.runInBackground = true;
@@ -73,20 +73,22 @@ namespace VRCSDK2
                         av.Get(false,
                             (c2) =>
                             {
-                                Debug.Log("<color=magenta>Updating an existing avatar.</color>");
+                                VRC.Core.Logger.Log("<color=magenta>Updating an existing avatar.</color>", DebugLevel.API);
                                 apiAvatar = c2.Model as ApiAvatar;
                                 pipelineManager.completedSDKPipeline = !string.IsNullOrEmpty(apiAvatar.authorId);
                                 SetupUI();
                             },
                             (c2) =>
                             {
-                                Debug.Log("<color=magenta>Creating a new avatar.</color>");
+                                VRC.Core.Logger.Log("<color=magenta>Creating a new avatar.</color>", DebugLevel.API);
                                 apiAvatar = new ApiAvatar();
                                 apiAvatar.id = pipelineManager.blueprintId;
                                 pipelineManager.completedSDKPipeline = !string.IsNullOrEmpty(apiAvatar.authorId);
                                 SetupUI();
                             });
-                    }, (c) => { LoginErrorCallback(c.Error); });
+                    }, (c) => {
+                        LoginErrorCallback(c.Error);
+                    });
         }
 
         void SetupUI()
@@ -187,7 +189,7 @@ namespace VRCSDK2
 
             if (!string.IsNullOrEmpty(unityPackagePath) && System.IO.File.Exists(unityPackagePath))
             {
-                Debug.Log("Found unity package path. Preparing to upload!");
+                VRC.Core.Logger.Log("Found unity package path. Preparing to upload!", DebugLevel.All);
                 PrepareUnityPackageForS3(unityPackagePath, avatarId, version, ApiAvatar.VERSION);
             }
 
@@ -202,6 +204,8 @@ namespace VRCSDK2
 
             if (caughtInvalidInput)
                 yield break;
+
+            VRC.Core.Logger.Log("Starting upload", DebugLevel.Always);
 
             // upload unity package
             if (!string.IsNullOrEmpty(uploadUnityPackagePath))
@@ -359,8 +363,8 @@ namespace VRCSDK2
             UnityEditor.EditorPrefs.DeleteKey("currentBuildingAssetBundlePath");
             UnityEditor.EditorPrefs.DeleteKey("externalPluginPath");
         }
-#endif
     }
+#endif
 }
 
 

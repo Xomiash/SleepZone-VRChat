@@ -1,4 +1,6 @@
-﻿using System.Collections;
+﻿#if VRC_SDK_VRCSDK2
+
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor;
@@ -19,8 +21,8 @@ public class CustomVideoStreamEntryDrawer : PropertyDrawer
         return EditorGUI.GetPropertyHeight(source, new GUIContent("Source"), true) + EditorGUIUtility.standardVerticalSpacing
             + EditorGUI.GetPropertyHeight(speed, new GUIContent("Playback Speed"), true) + EditorGUIUtility.standardVerticalSpacing
             + Mathf.Max(EditorGUI.GetPropertyHeight(clip, new GUIContent("VideoClip"), true), EditorGUI.GetPropertyHeight(url, new GUIContent("URL"), true)) + EditorGUIUtility.standardVerticalSpacing
-            + EditorGUI.GetPropertyHeight(speed, new GUIContent("SyncType"), true) + EditorGUIUtility.standardVerticalSpacing
-            + EditorGUI.GetPropertyHeight(speed, new GUIContent("SyncMinutes"), true) + EditorGUIUtility.standardVerticalSpacing;
+            + EditorGUI.GetPropertyHeight(live, new GUIContent("SyncType"), true) + EditorGUIUtility.standardVerticalSpacing
+            + EditorGUI.GetPropertyHeight(sync, new GUIContent("SyncMinutes"), true) + EditorGUIUtility.standardVerticalSpacing;
     }
 
     public override void OnGUI(Rect rect, SerializedProperty property, GUIContent label)
@@ -112,3 +114,5 @@ public class SyncVideoStreamEditor : Editor
         sourceList.drawHeaderCallback = (Rect rect) => EditorGUI.LabelField(rect, "Videos");
     }
 }
+
+#endif

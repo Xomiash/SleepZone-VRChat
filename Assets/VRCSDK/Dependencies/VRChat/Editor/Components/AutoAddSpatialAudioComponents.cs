@@ -1,9 +1,7 @@
-﻿#define SUPPORT_DEPRECATED_ONSP
-
-using UnityEngine;
+﻿using UnityEngine;
 using System.Collections;
 using UnityEditor;
-using VRCSDK2;
+using VRC.SDKBase;
 
 [InitializeOnLoad]
 public class AutoAddSpatialAudioComponents
@@ -52,7 +50,7 @@ public class AutoAddSpatialAudioComponents
         if (audioSrc == null)
             return false;
 
-        var vrcsp = audioSrc.gameObject.GetComponent<VRCSDK2.VRC_SpatialAudioSource>();
+        var vrcsp = audioSrc.gameObject.GetComponent<VRC.SDKBase.VRC_SpatialAudioSource>();
 
         // don't make changes if we already have a vrcsp and we aren't forcing
         if (vrcsp != null && !force)
@@ -66,29 +64,10 @@ public class AutoAddSpatialAudioComponents
         // is audio source set to be 2D?
         bool is2D = audioSrc.spatialBlend == 0;
 
-#if SUPPORT_DEPRECATED_ONSP
-        var onsp = audioSrc.GetComponent<ONSPAudioSource>();
-        if (onsp != null)
-        {
-            if (vrcsp == null)
-            {
-                // copy the values from deprecated component
-                vrcsp = audioSrc.gameObject.AddComponent<VRCSDK2.VRC_SpatialAudioSource>();
-                vrcsp.Gain = onsp.Gain;
-                vrcsp.Near = onsp.Near;
-                vrcsp.Far = onsp.Far;
-                vrcsp.UseAudioSourceVolumeCurve = !onsp.UseInvSqr;
-                vrcsp.EnableSpatialization = onsp.EnableSpatialization;
-            }
-
-            // remove deprecated component
-            Component.DestroyImmediate(onsp);
-        }
-#endif
         if (vrcsp == null)
         {
             // no onsp and no vrcsp, so add
-            vrcsp = audioSrc.gameObject.AddComponent<VRCSDK2.VRC_SpatialAudioSource>();
+            vrcsp = audioSrc.gameObject.AddComponent<VRC.SDKBase.VRC_SpatialAudioSource>();
             if (is2D)
             {
                 // this audio source was marked as 2D, leave the vrcsp disabled
@@ -102,7 +81,7 @@ public class AutoAddSpatialAudioComponents
 
         if (initValues)
         {
-            bool isAvatar = audioSrc.GetComponentInParent<VRCSDK2.VRC_AvatarDescriptor>();
+            bool isAvatar = audioSrc.GetComponentInParent<VRC.SDKBase.VRC_AvatarDescriptor>();
 
             vrcsp.Gain = isAvatar ? VRCSDK2.AudioManagerSettings.AvatarAudioMaxGain : VRCSDK2.AudioManagerSettings.RoomAudioGain;
             vrcsp.Near = 0;
@@ -196,11 +175,11 @@ public class AutoAddSpatialAudioComponents
         var onsp = src.GetComponent<ONSPAudioSource>();
         if (onsp != null)
         {
-            var vrcsp = src.gameObject.GetComponent<VRCSDK2.VRC_SpatialAudioSource>();
+            var vrcsp = src.gameObject.GetComponent<VRC.SDKBase.VRC_SpatialAudioSource>();
             if (vrcsp == null)
             {
                 // copy the values from deprecated component
-                vrcsp = src.gameObject.AddComponent<VRCSDK2.VRC_SpatialAudioSource>();
+                vrcsp = src.gameObject.AddComponent<VRC.SDKBase.VRC_SpatialAudioSource>();
                 vrcsp.Gain = onsp.Gain;
                 vrcsp.Near = onsp.Near;
                 vrcsp.Far = onsp.Far;
@@ -216,13 +195,13 @@ public class AutoAddSpatialAudioComponents
     {
         if (src == null) return;
 
-        var vrcsp = src.gameObject.GetComponent<VRCSDK2.VRC_SpatialAudioSource>();
+        var vrcsp = src.gameObject.GetComponent<VRC.SDKBase.VRC_SpatialAudioSource>();
         if (vrcsp != null) return;
 
-        vrcsp = src.gameObject.AddComponent<VRCSDK2.VRC_SpatialAudioSource>();
+        vrcsp = src.gameObject.AddComponent<VRC.SDKBase.VRC_SpatialAudioSource>();
 
         // add default values
-        bool isAvatar = src.gameObject.GetComponentInParent<VRCSDK2.VRC_AvatarDescriptor>();
+        bool isAvatar = src.gameObject.GetComponentInParent<VRC.SDKBase.VRC_AvatarDescriptor>();
 
         vrcsp.Gain = isAvatar ? VRCSDK2.AudioManagerSettings.AvatarAudioMaxGain : VRCSDK2.AudioManagerSettings.RoomAudioGain;
         vrcsp.Near = 0;

@@ -1,5 +1,4 @@
-﻿using System.Linq;
-using System.Collections;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
 using System.Reflection;
@@ -8,142 +7,172 @@ namespace VRCSDK2.Validation
 {
     public static class ValidationUtils
     {
-        public static IEnumerable<Component> FindIllegalComponents(GameObject target, System.Type[] whitelist)
+        public static void RemoveIllegalComponents(GameObject target, HashSet<Type> whitelist, bool retry = true, bool onlySceneObjects = false, bool logStripping = true)
         {
-            List<Component> bad = new List<Component>();
-            IEnumerator seeker = FindIllegalComponentsEnumerator(target, whitelist, (c) => bad.Add(c));
-            while (seeker.MoveNext()) ;
-            return bad;
-        }
-
-        public static void RemoveIllegalComponents(GameObject target, System.Type[] whitelist, bool retry = true, bool onlySceneObjects = false, bool logStripping = true)
-        {
-            bool foundBad = false;
-            IEnumerator remover = FindIllegalComponentsEnumerator(target, whitelist, (c) => {
-                if (c != null)
-                {
-                    if(onlySceneObjects && c.GetInstanceID() < 0)
-                        return;
-
-                    if(logStripping)
-                        Debug.LogWarningFormat("Removed component of type {0} found on {1}", c.GetType().Name, c.gameObject.name);
-
-                    RemoveComponent(c);
-
-                    foundBad = true;
-                }
-            }, false);
-            while (remover.MoveNext());
-
-            if (retry && foundBad)
-                RemoveIllegalComponents(target, whitelist, false, onlySceneObjects);
-        }
-
-        public static IEnumerator RemoveIllegalComponentsEnumerator(GameObject target, System.Type[] whitelist, bool retry = true, bool onlySceneObjects = false)
-        {
-            bool foundBad = false;
-            yield return FindIllegalComponentsEnumerator(target, whitelist, (c) => {
-                if (c != null)
-                {
-                    if(onlySceneObjects && c.GetInstanceID() < 0)
-                        return;
-
-                    Debug.LogWarningFormat("Removed component of type {0} found on {1}", c.GetType().Name, c.gameObject.name);
-
-                    RemoveComponent(c);
-
-                    foundBad = true;
-                }
-            });
-
-            if (retry && foundBad)
-                yield return RemoveIllegalComponentsEnumerator(target, whitelist, false, onlySceneObjects);
-        }
-
-        public static IEnumerator FindIllegalComponentsEnumerator(GameObject target, System.Type[] whitelist, System.Action<Component> onFound, bool useWatch = true)
-        {
-            System.Diagnostics.Stopwatch watch = new System.Diagnostics.Stopwatch();
-            if(useWatch)
-                watch.Start();
-
-            HashSet<System.Type> typesInUse = new HashSet<System.Type>();
-            List<Component> componentsInUse = new List<Component>();
-            Queue<GameObject> children = new Queue<GameObject>();
-            children.Enqueue(target.gameObject);
-            while (children.Count > 0)
+            IEnumerable<Component> foundComponents = FindIllegalComponents(target, whitelist);
+            foreach(Component component in foundComponents)
             {
-                GameObject child = children.Dequeue();
-                if(child == null)
-                    continue;
-
-                int childCount = child.transform.childCount;
-                for (int idx = 0; idx < child.transform.childCount; ++idx)
-                    children.Enqueue(child.transform.GetChild(idx).gameObject);
-                foreach (Component c in child.transform.GetComponents<Component>())
+                if(component == null)
                 {
-                    if (c == null)
-                        continue;
+                    continue;
+                }
+                
+                if (onlySceneObjects && component.GetInstanceID() < 0)
+                {
+                    continue;
+                }
 
-                    if (typesInUse.Contains(c.GetType()) == false)
-                        typesInUse.Add(c.GetType());
+                if (logStripping)
+                {
+                    VRC.Core.Logger.LogWarning(string.Format("Removing {0} comp from {1}", component.GetType().Name, component.gameObject.name));
+                }
 
-                    if (!whitelist.Any(allowedType => c.GetType() == allowedType || c.GetType().IsSubclassOf(allowedType)))
+                RemoveComponent(component);
+            }
+        }
+
+        public static IEnumerable<Component> FindIllegalComponents(GameObject target, HashSet<Type> whitelist)
+        {
+            List<Component> foundComponents = new List<Component>();
+            Component[] allComponents = target.GetComponentsInChildren<Component>(true);
+            foreach(Component component in allComponents)
+            {
+                if(component == null)
+                {
+                    continue;
+                }
+
+                Type componentType = component.GetType();
+                if(whitelist.Contains(componentType))
+                {
+                    continue;
+                }
+
+                foundComponents.Add(component);
+            }
+
+            return foundComponents;
+        }
+
+        private static readonly Dictionary<string, Type> _typeCache = new Dictionary<string, Type>();
+        private static readonly Dictionary<string, HashSet<Type>> _whitelistCache = new Dictionary<string, HashSet<Type>>();
+        public static HashSet<Type> WhitelistedTypes(string whitelistName, IEnumerable<string> componentTypeWhitelist)
+        {
+            if (_whitelistCache.ContainsKey(whitelistName))
+            {
+                return _whitelistCache[whitelistName];
+            }
+
+            Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
+            HashSet<Type> whitelist = new HashSet<Type>();
+            foreach(string whitelistedTypeName in componentTypeWhitelist)
+            {
+                Type whitelistedType = GetTypeFromName(whitelistedTypeName, assemblies);
+                if(whitelistedType == null)
+                {
+                    continue;
+                }
+
+                if(whitelist.Contains(whitelistedType))
+                {
+                    continue;
+                }
+
+                whitelist.Add(whitelistedType);
+            }
+
+            AddDerivedClasses(whitelist);
+
+            _whitelistCache[whitelistName] = whitelist;
+
+            return _whitelistCache[whitelistName];
+        }
+
+        public static HashSet<Type> WhitelistedTypes(string whitelistName, IEnumerable<Type> componentTypeWhitelist)
+        {
+            if (_whitelistCache.ContainsKey(whitelistName))
+            {
+                return _whitelistCache[whitelistName];
+            }
+
+            HashSet<Type> whitelist = new HashSet<Type>();
+            whitelist.UnionWith(componentTypeWhitelist);
+
+            AddDerivedClasses(whitelist);
+
+            _whitelistCache[whitelistName] = whitelist;
+
+            return _whitelistCache[whitelistName];
+        }
+
+        private static void AddDerivedClasses(HashSet<Type> whitelist)
+        {
+            Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
+            foreach(Assembly assembly in assemblies)
+            {
+                foreach(Type type in assembly.GetTypes())
+                {
+                    if(whitelist.Contains(type))
                     {
-                        onFound(c);
-                        yield return null;
+                        continue;
                     }
 
-                    if (useWatch && watch.ElapsedMilliseconds > 1)
+                    if(!typeof(Component).IsAssignableFrom(type))
                     {
-                        yield return null;
-                        watch.Reset();
+                        continue;
+                    }
+
+                    Type currentType = type;
+                    while(currentType != typeof(object) && currentType != null)
+                    {
+                        if(whitelist.Contains(currentType))
+                        {
+                            whitelist.Add(type);
+                            break;
+                        }
+
+                        currentType = currentType.BaseType;
                     }
                 }
             }
         }
 
-        private static Dictionary<string, System.Type> _typeCache = new Dictionary<string, System.Type>();
-        private static Dictionary<string, System.Type[]> _whitelistCache = new Dictionary<string, System.Type[]>();
-        public static System.Type[] WhitelistedTypes(string whitelistName, string[] ComponentTypeWhitelist)
+        public static Type GetTypeFromName(string name, Assembly[] assemblies = null)
         {
-            if (_whitelistCache.ContainsKey(whitelistName))
-                return _whitelistCache[whitelistName];
-
-            Assembly[] assemblies = System.AppDomain.CurrentDomain.GetAssemblies();
-
-            _whitelistCache[whitelistName] = ComponentTypeWhitelist.Select((name) => GetTypeFromName(name, assemblies)).Where(t => t != null).ToArray();
-
-            return _whitelistCache[whitelistName];
-        }
-
-        public static System.Type GetTypeFromName(string name, Assembly[] assemblies = null)
-        {
-            if(_typeCache.ContainsKey(name))
-                return _typeCache[name];
-
-            if(assemblies == null)
-                assemblies = System.AppDomain.CurrentDomain.GetAssemblies();
-
-            foreach (Assembly a in assemblies)
+            if (_typeCache.ContainsKey(name))
             {
-                System.Type found = a.GetType(name);
-                if (found != null)
+                
+                return _typeCache[name];
+            }
+
+            if (assemblies == null)
+            {
+                assemblies = AppDomain.CurrentDomain.GetAssemblies();
+            }
+
+            foreach (Assembly assembly in assemblies)
+            {
+                Type found = assembly.GetType(name);
+                if(found == null)
                 {
-                    _typeCache[name] = found;
-                    return found;
+                    continue;
                 }
+
+                _typeCache[name] = found;
+                return found;
             }
 
             //This is really verbose for some SDK scenes, eg.
             //If they don't have FinalIK installed
 #if VRC_CLIENT && UNITY_EDITOR
-                Debug.LogWarningFormat("Could not find type {0}", name);
+            Debug.LogWarningFormat("Could not find type {0}", name);
 #endif
+
             _typeCache[name] = null;
             return null;
         }
 
-        public static void RemoveDependencies(Component component)
+        private static void RemoveDependencies(Component component)
         {
             if (component == null)
                 return;
@@ -179,22 +208,21 @@ namespace VRCSDK2.Validation
                 }
 
                 if (deleteMe)
-                {
-                    Debug.LogWarningFormat("Deleting component dependency {0} found on {1}", c.GetType().Name, component.gameObject.name);
-
                     RemoveComponent(c);
-                }
             }
         }
 
         public static void RemoveComponent(Component comp)
         {
+            if (comp == null)
+                return;
+
             RemoveDependencies(comp);
 
 #if VRC_CLIENT
-            Object.DestroyImmediate(comp, true);
+            UnityEngine.Object.DestroyImmediate(comp, true);
 #else
-            Object.DestroyImmediate(comp, false);
+            UnityEngine.Object.DestroyImmediate(comp, false);
 #endif
         }
 
@@ -207,8 +235,6 @@ namespace VRCSDK2.Validation
             {
                 if (comp == null || comp.gameObject == null)
                     continue;
-
-                Debug.LogWarningFormat("Removing {0} comp from {1}", comp.GetType().Name, comp.gameObject.name);
 
                 RemoveComponent(comp);
             }

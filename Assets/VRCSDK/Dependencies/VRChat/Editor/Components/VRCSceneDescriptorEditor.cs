@@ -1,3 +1,4 @@
+#if VRC_SDK_VRCSDK2
 using UnityEngine;
 using UnityEditor;
 using System.Collections;
@@ -25,3 +26,4 @@ public class VRCSceneDescriptorEditor : Editor
 
     }
 }
+#endif

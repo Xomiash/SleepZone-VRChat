@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿#if VRC_SDK_VRCSDK2
+using UnityEngine;
 using System.Collections;
 using UnityEditor;
 using System;
@@ -19,3 +20,4 @@ public class VRCObjectSpawnEditor : Editor
         DrawDefaultInspector();
     }
 }
+#endif

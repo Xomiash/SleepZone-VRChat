@@ -1,79 +1,34 @@
-﻿using System.Collections;
+﻿using System;
 using System.Collections.Generic;
+using JetBrains.Annotations;
 using UnityEngine;
 
 namespace VRCSDK2.Validation
 {
     public static class WorldValidation
     {
-        public static readonly string[] ComponentTypeWhiteList = new string[] {
-            "VRCSDK2.VRCTriggerRelay",
-            "VRCSDK2.VRC_AudioBank",
-#if UNITY_STANDALONE
-            "VRCSDK2.VRC_CustomRendererBehaviour",
-#endif
-            "VRCSDK2.VRC_DataStorage",
-            "VRCSDK2.VRC_EventHandler",
-            "VRCSDK2.VRC_IKFollower",
-            "VRCSDK2.VRC_Label",
-            "VRCSDK2.VRC_KeyEvents",
-            "VRCSDK2.VRC_PhysicsRoot",
-            "VRCSDK2.VRC_CombatSystem",
-            "VRCSDK2.VRC_DestructibleStandard",
-            "VRC_VisualDamage",
-            "VRCSDK2.VRC_MirrorCamera",
-#if UNITY_STANDALONE
-            "VRCSDK2.VRC_MidiNoteIn",
-#endif
-            "VRCSDK2.VRC_OscButtonIn",
-            "VRCSDK2.VRC_AddDamage",
-            "VRCSDK2.VRC_AddHealth",
-            "VRCSDK2.VRC_AvatarCalibrator",
-            "VRCSDK2.VRC_AvatarPedestal",
-            "VRCSDK2.VRC_GunStats",
-            "VRCSDK2.VRC_JukeBox",
-            "VRCSDK2.VRC_NPCSpawn",
-            "VRCSDK2.VRC_ObjectSpawn",
-            "VRCSDK2.VRC_ObjectSync",
-            "VRCSDK2.VRC_Pickup",
-            "VRCSDK2.VRC_PortalMarker",
-            "VRCSDK2.VRC_SlideShow",
-            "VRCSDK2.VRC_SpatialAudioSource",
-            "VRCSDK2.VRC_StationInput",
-            "VRCSDK2.VRC_SyncAnimation",
-            "VRCSDK2.VRC_SyncVideoPlayer",
-            "VRCSDK2.VRC_SyncVideoStream",
-            "VRCSDK2.VRC_VideoScreen",
-            "VRCSDK2.VRC_VideoSpeaker",
-            "VRCSDK2.VRC_PlayerAudioOverride",
-            "VRC_YouTubeSync", // TODO: this is deprecated and should be removed
-            "VRCSDK2.VRC_MirrorReflection",
-#if UNITY_STANDALONE
-            "VRCSDK2.scripts.Scenes.VRC_Panorama",
-#endif
-            "VRCSDK2.VRC_PlayerMods",
-            "VRCSDK2.VRC_SceneDescriptor",
-            "VRCSDK2.VRC_SceneResetPosition",
-            "VRCSDK2.VRC_SceneSmoothShift",
-            "VRCSDK2.VRC_SpecialLayer",
-            "VRCSDK2.VRC_Station",
-            "VRCSDK2.VRC_StereoObject",
-            "VRCSDK2.VRC_TimedEvents",
-            "VRCSDK2.VRC_Trigger",
-            "VRCSDK2.VRC_TriggerColliderEventTrigger",
-            "VRCSDK2.VRC_UseEvents",
-#if UNITY_STANDALONE
-            "VRCSDK2.VRC_Water",
-            "VRCSDK2.VRC_Webpanel", // TODO: this is deprecated and should be removed
-#endif
-            "VRCSDK2.VRC_UiShape",
+        static string[] ComponentTypeWhiteList = null;
+        public enum WhiteListConfiguration
+        {
+            None,
+            VRCSDK2,
+            VRCSDK3,
+            Unchanged
+        }
+        static WhiteListConfiguration ComponentTypeWhiteListConfiguration = WhiteListConfiguration.None;
+
+        static readonly string[] ComponentTypeWhiteListCommon = new string[]
+        {
+            #if UNITY_STANDALONE
+                "UnityEngine.Rendering.PostProcessing.PostProcessDebug",
+                "UnityEngine.Rendering.PostProcessing.PostProcessLayer",
+                "UnityEngine.Rendering.PostProcessing.PostProcessVolume",
+            #endif
             "VRC.Core.PipelineManager",
             "UiInputField",
             "VRCProjectSettings",
             "DynamicBone",
             "DynamicBoneCollider",
-            "TMPro.InlineGraphic",
-            "TMPro.InlineGraphicManager",
             "TMPro.TMP_Dropdown",
             "TMPro.TMP_InputField",
             "TMPro.TMP_ScrollbarEventHandler",
@@ -127,14 +82,6 @@ namespace VRCSDK2.Validation
             "UnityEngine.UI.Outline",
             "UnityEngine.UI.PositionAsUV1",
             "UnityEngine.UI.Shadow",
-#if UNITY_STANDALONE
-            "UnityEngine.Rendering.PostProcessing.PostProcessDebug",
-            "UnityEngine.Rendering.PostProcessing.PostProcessLayer",
-            "UnityEngine.Rendering.PostProcessing.PostProcessVolume",
-            "UnityEngine.PostProcessing.PostProcessingBehaviour",
-            "VolumetricFogAndMist.FogVolumeExtensions",
-            "DynamicFogAndMist.FogVolumeExtensions",
-#endif
             "RenderHeads.Media.AVProVideo.ApplyToMaterial",
             "RenderHeads.Media.AVProVideo.ApplyToMesh",
             "RenderHeads.Media.AVProVideo.AudioOutput",
@@ -147,24 +94,6 @@ namespace VRCSDK2.Validation
             "RenderHeads.Media.AVProVideo.StreamParser",
             "RenderHeads.Media.AVProVideo.SubtitlesUGUI",
             "RenderHeads.Media.AVProVideo.UpdateStereoMaterial",
-            "PhysSound.PhysSoundBase",
-            "PhysSound.PhysSoundObject",
-            "PhysSound.PhysSoundTempAudio",
-            "PhysSound.PhysSoundTempAudioPool",
-            "PhysSound.PhysSoundTerrain",
-            "RealisticEyeMovements.EyeAndHeadAnimator",
-            "RealisticEyeMovements.LookTargetController",
-#if UNITY_STANDALONE
-            "DynamicFogAndMist.DynamicFog",
-            "DynamicFogAndMist.DynamicFogManager",
-            "DynamicFogAndMist.DynamicFogOfWar",
-            "DynamicFogAndMist.FogVolume",
-            "VolumetricFogAndMist.FogAreaCullingManager",
-            "VolumetricFogAndMist.FogVolume",
-            "VolumetricFogAndMist.VolumetricFog",
-            "VolumetricFogAndMist.VolumetricFogPosT",
-            "VolumetricFogAndMist.VolumetricFogPreT",
-#endif
             "OVRLipSync",
             "OVRLipSyncContext",
             "OVRLipSyncContextBase",
@@ -241,85 +170,6 @@ namespace VRCSDK2.Validation
             //
             "RootMotion.SolverManager",
             "RootMotion.TriggerEventBroadcaster",
-            "UnityStandardAssets.Cameras.AbstractTargetFollower",
-            "UnityStandardAssets.Cameras.AutoCam",
-            "UnityStandardAssets.Cameras.FreeLookCam",
-            "UnityStandardAssets.Cameras.HandHeldCam",
-            "UnityStandardAssets.Cameras.LookatTarget",
-            "UnityStandardAssets.Cameras.PivotBasedCameraRig",
-            "UnityStandardAssets.Cameras.ProtectCameraFromWallClip",
-            "UnityStandardAssets.Cameras.TargetFieldOfView",
-            "UnityStandardAssets.Characters.FirstPerson.FirstPersonController",
-            "UnityStandardAssets.Characters.FirstPerson.HeadBob",
-            "UnityStandardAssets.Characters.FirstPerson.RigidbodyFirstPersonController",
-            "UnityStandardAssets.Vehicles.Ball.Ball",
-            "UnityStandardAssets.Vehicles.Ball.BallUserControl",
-            "UnityStandardAssets.Characters.ThirdPerson.AICharacterControl",
-            "UnityStandardAssets.Characters.ThirdPerson.ThirdPersonCharacter",
-            "UnityStandardAssets.Characters.ThirdPerson.ThirdPersonUserControl",
-            "UnityStandardAssets.CrossPlatformInput.AxisTouchButton",
-            "UnityStandardAssets.CrossPlatformInput.ButtonHandler",
-            "UnityStandardAssets.CrossPlatformInput.InputAxisScrollbar",
-            "UnityStandardAssets.CrossPlatformInput.Joystick",
-            "UnityStandardAssets.CrossPlatformInput.MobileControlRig",
-            "UnityStandardAssets.CrossPlatformInput.TiltInput",
-            "UnityStandardAssets.CrossPlatformInput.TouchPad",
-#if UNITY_STANDALONE
-            "UnityStandardAssets.Water.WaterBasic",
-            "UnityStandardAssets.Water.Displace",
-            "UnityStandardAssets.Water.GerstnerDisplace",
-            "UnityStandardAssets.Water.PlanarReflection",
-            "UnityStandardAssets.Water.SpecularLighting",
-            "UnityStandardAssets.Water.Water",
-            "UnityStandardAssets.Water.WaterBase",
-            "UnityStandardAssets.Water.WaterTile",
-#endif
-            "UnityStandardAssets.Effects.AfterburnerPhysicsForce",
-            "UnityStandardAssets.Effects.ExplosionFireAndDebris",
-            "UnityStandardAssets.Effects.ExplosionPhysicsForce",
-            "UnityStandardAssets.Effects.Explosive",
-            "UnityStandardAssets.Effects.ExtinguishableParticleSystem",
-            "UnityStandardAssets.Effects.FireLight",
-            "UnityStandardAssets.Effects.Hose",
-            "UnityStandardAssets.Effects.ParticleSystemMultiplier",
-            "UnityStandardAssets.Effects.SmokeParticles",
-            "UnityStandardAssets.Effects.WaterHoseParticles",
-            "UnityStandardAssets.Utility.ActivateTrigger",
-            "AlphaButtonClickMask",
-            "UnityStandardAssets.Utility.AutoMoveAndRotate",
-            "UnityStandardAssets.Utility.DragRigidbody",
-            "UnityStandardAssets.Utility.DynamicShadowSettings",
-            "EventSystemChecker",
-            "UnityStandardAssets.Utility.FollowTarget",
-            "UnityStandardAssets.Utility.FPSCounter",
-            "UnityStandardAssets.Utility.ObjectResetter",
-            "UnityStandardAssets.Utility.ParticleSystemDestroyer",
-            "UnityStandardAssets.Utility.SimpleActivatorMenu",
-            "UnityStandardAssets.Utility.SimpleMouseRotator",
-            "UnityStandardAssets.Utility.SmoothFollow",
-            "UnityStandardAssets.Utility.TimedObjectActivator",
-            "UnityStandardAssets.Utility.TimedObjectDestructor",
-            "UnityStandardAssets.Utility.WaypointCircuit",
-            "UnityStandardAssets.Utility.WaypointProgressTracker",
-            "UnityStandardAssets.Vehicles.Aeroplane.AeroplaneAiControl",
-            "UnityStandardAssets.Vehicles.Aeroplane.AeroplaneAudio",
-            "UnityStandardAssets.Vehicles.Aeroplane.AeroplaneController",
-            "UnityStandardAssets.Vehicles.Aeroplane.AeroplaneControlSurfaceAnimator",
-            "UnityStandardAssets.Vehicles.Aeroplane.AeroplanePropellerAnimator",
-            "UnityStandardAssets.Vehicles.Aeroplane.AeroplaneUserControl2Axis",
-            "UnityStandardAssets.Vehicles.Aeroplane.AeroplaneUserControl4Axis",
-            "UnityStandardAssets.Vehicles.Aeroplane.JetParticleEffect",
-            "UnityStandardAssets.Vehicles.Aeroplane.LandingGear",
-            "UnityStandardAssets.Vehicles.Car.BrakeLight",
-            "UnityStandardAssets.Vehicles.Car.CarAIControl",
-            "UnityStandardAssets.Vehicles.Car.CarAudio",
-            "UnityStandardAssets.Vehicles.Car.CarController",
-            "UnityStandardAssets.Vehicles.Car.CarSelfRighting",
-            "UnityStandardAssets.Vehicles.Car.CarUserControl",
-            "UnityStandardAssets.Vehicles.Car.Mudguard",
-            "UnityStandardAssets.Vehicles.Car.SkidTrail",
-            "UnityStandardAssets.Vehicles.Car.Suspension",
-            "UnityStandardAssets.Vehicles.Car.WheelEffects",
             "UnityEngine.WindZone",
             "UnityEngine.Video.VideoPlayer",
             "UnityEngine.Tilemaps.Tilemap",
@@ -327,12 +177,6 @@ namespace VRCSDK2.Validation
             "UnityEngine.Terrain",
             "UnityEngine.Tree",
             "UnityEngine.SpriteMask",
-            "UnityEngine.ParticleEmitter",
-            "UnityEngine.EllipsoidParticleEmitter",
-            "UnityEngine.MeshParticleEmitter",
-            "UnityEngine.ParticleAnimator",
-            "UnityEngine.ParticleRenderer",
-            "UnityEngine.WorldParticleCollider",
             "UnityEngine.Grid",
             "UnityEngine.GridLayout",
             "UnityEngine.AudioSource",
@@ -348,9 +192,7 @@ namespace VRCSDK2.Validation
             "UnityEngine.Canvas",
             "UnityEngine.CanvasGroup",
             "UnityEngine.CanvasRenderer",
-            "UnityEngine.GUIText",
             "UnityEngine.TextMesh",
-            "UnityEngine.Animation",
             "UnityEngine.Animator",
             "UnityEngine.AI.NavMeshAgent",
             "UnityEngine.AI.NavMeshObstacle",
@@ -381,7 +223,6 @@ namespace VRCSDK2.Validation
             "UnityEngine.TrailRenderer",
             "UnityEngine.LineRenderer",
             "UnityEngine.GUIElement",
-            "UnityEngine.GUITexture",
             "UnityEngine.GUILayer",
             "UnityEngine.Light",
             "UnityEngine.LightProbeGroup",
@@ -400,8 +241,196 @@ namespace VRCSDK2.Validation
             "UnityEngine.MeshFilter",
             "UnityEngine.Halo",
             "UnityEngine.MeshRenderer",
-            "VRC.Udon.UdonBehaviour",
+            "UnityEngine.Collider2D",
+            "UnityEngine.Rigidbody2D",
+            "UnityEngine.CompositeCollider2D",
+            "UnityEngine.ConstantForce2D",
+            "UnityEngine.AreaEffector2D",
+            "UnityEngine.CapsuleCollider2D",
+            "UnityEngine.DistanceJoint2D",
+            "UnityEngine.EdgeCollider2D",
+            "UnityEngine.Effector2D",
+            "UnityEngine.BoxCollider2D",
+            "UnityEngine.CircleCollider2D",
+            "UnityEngine.FixedJoint2D",
+            "UnityEngine.HingeJoint2D",
+            "UnityEngine.FrictionJoint2D",
+            "UnityEngine.PlatformEffector2D",
+            "UnityEngine.PointEffector2D",
+            "UnityEngine.PolygonCollider2D",
+            "UnityEngine.SliderJoint2D",
+            "UnityEngine.SurfaceEffector2D",
+            "UnityEngine.RelativeJoint2D",
+            "UnityEngine.TargetJoint2D",
+            "UnityEngine.WheelJoint2D",
+            "UnityEngine.Joint2D",
+            "UnityEngine.ParticleSystemForceField"
+        };
+
+        static readonly string[] ComponentTypeWhiteListSdk2 = new string[]
+        {
+            #if UNITY_STANDALONE
+                "VRCSDK2.VRC_CustomRendererBehaviour",
+                "VRCSDK2.VRC_MidiNoteIn",
+                "VRCSDK2.scripts.Scenes.VRC_Panorama",
+                "VRCSDK2.VRC_Water",
+                "UnityStandardAssets.Water.WaterBasic",
+                "UnityStandardAssets.Water.Displace",
+                "UnityStandardAssets.Water.GerstnerDisplace",
+                "UnityStandardAssets.Water.PlanarReflection",
+                "UnityStandardAssets.Water.SpecularLighting",
+                "UnityStandardAssets.Water.Water",
+                "UnityStandardAssets.Water.WaterBase",
+                "UnityStandardAssets.Water.WaterTile",
+            #endif
+            "VRCSDK2.VRCTriggerRelay",
+            "VRCSDK2.VRC_AudioBank",
+            "VRCSDK2.VRC_DataStorage",
+            "VRCSDK2.VRC_EventHandler",
+            "VRCSDK2.VRC_IKFollower",
+            "VRCSDK2.VRC_Label",
+            "VRCSDK2.VRC_KeyEvents",
+            "VRCSDK2.VRC_PhysicsRoot",
+            "VRCSDK2.VRC_CombatSystem",
+            "VRCSDK2.VRC_DestructibleStandard",
+            "VRC_VisualDamage",
+            "VRCSDK2.VRC_MirrorCamera",
+            "VRCSDK2.VRC_OscButtonIn",
+            "VRCSDK2.VRC_GunStats",
+            "VRCSDK2.VRC_JukeBox",
+            "VRCSDK2.VRC_AddDamage",
+            "VRCSDK2.VRC_AddHealth",
+            "VRCSDK2.VRC_AvatarCalibrator",
+            "VRCSDK2.VRC_AvatarPedestal",
+            "VRCSDK2.VRC_NPCSpawn",
+            "VRCSDK2.VRC_ObjectSpawn",
+            "VRCSDK2.VRC_ObjectSync",
+            "VRCSDK2.VRC_Pickup",
+            "VRCSDK2.VRC_PortalMarker",
+            "VRCSDK2.VRC_SlideShow",
+            "VRCSDK2.VRC_SpatialAudioSource",
+            "VRCSDK2.VRC_StationInput",
+            "VRCSDK2.VRC_SyncAnimation",
+            "VRCSDK2.VRC_SyncVideoPlayer",
+            "VRCSDK2.VRC_SyncVideoStream",
+            "VRCSDK2.VRC_VideoScreen",
+            "VRCSDK2.VRC_VideoSpeaker",
+            "VRCSDK2.VRC_PlayerAudioOverride",
+            "VRCSDK2.VRC_MirrorReflection",
+            "VRCSDK2.VRC_PlayerMods",
+            "VRCSDK2.VRC_SceneDescriptor",
+            "VRCSDK2.VRC_SceneResetPosition",
+            "VRCSDK2.VRC_SceneSmoothShift",
+            "VRCSDK2.VRC_SpecialLayer",
+            "VRCSDK2.VRC_Station",
+            "VRCSDK2.VRC_StereoObject",
+            "VRCSDK2.VRC_TimedEvents",
+            "VRCSDK2.VRC_Trigger",
+            "VRCSDK2.VRC_TriggerColliderEventTrigger",
+            "VRCSDK2.VRC_UseEvents",
+            "VRCSDK2.VRC_UiShape",
+            "UnityEngine.Animation",
+            "UnityEngine.GUIText",
+            "UnityEngine.GUITexture",
+            "PhysSound.PhysSoundBase",
+            "PhysSound.PhysSoundObject",
+            "PhysSound.PhysSoundTempAudio",
+            "PhysSound.PhysSoundTempAudioPool",
+            "PhysSound.PhysSoundTerrain",
+            "RealisticEyeMovements.EyeAndHeadAnimator",
+            "RealisticEyeMovements.LookTargetController",
+            "UnityStandardAssets.Cameras.AbstractTargetFollower",
+            "UnityStandardAssets.Cameras.AutoCam",
+            "UnityStandardAssets.Cameras.FreeLookCam",
+            "UnityStandardAssets.Cameras.HandHeldCam",
+            "UnityStandardAssets.Cameras.LookatTarget",
+            "UnityStandardAssets.Cameras.PivotBasedCameraRig",
+            "UnityStandardAssets.Cameras.ProtectCameraFromWallClip",
+            "UnityStandardAssets.Cameras.TargetFieldOfView",
+            "UnityStandardAssets.Characters.FirstPerson.FirstPersonController",
+            "UnityStandardAssets.Characters.FirstPerson.HeadBob",
+            "UnityStandardAssets.Characters.FirstPerson.RigidbodyFirstPersonController",
+            "UnityStandardAssets.Vehicles.Ball.Ball",
+            "UnityStandardAssets.Vehicles.Ball.BallUserControl",
+            "UnityStandardAssets.Characters.ThirdPerson.AICharacterControl",
+            "UnityStandardAssets.Characters.ThirdPerson.ThirdPersonCharacter",
+            "UnityStandardAssets.Characters.ThirdPerson.ThirdPersonUserControl",
+            "UnityStandardAssets.CrossPlatformInput.AxisTouchButton",
+            "UnityStandardAssets.CrossPlatformInput.ButtonHandler",
+            "UnityStandardAssets.CrossPlatformInput.InputAxisScrollbar",
+            "UnityStandardAssets.CrossPlatformInput.Joystick",
+            "UnityStandardAssets.CrossPlatformInput.MobileControlRig",
+            "UnityStandardAssets.CrossPlatformInput.TiltInput",
+            "UnityStandardAssets.CrossPlatformInput.TouchPad",
+            "UnityStandardAssets.Effects.AfterburnerPhysicsForce",
+            "UnityStandardAssets.Effects.ExplosionFireAndDebris",
+            "UnityStandardAssets.Effects.ExplosionPhysicsForce",
+            "UnityStandardAssets.Effects.Explosive",
+            "UnityStandardAssets.Effects.ExtinguishableParticleSystem",
+            "UnityStandardAssets.Effects.FireLight",
+            "UnityStandardAssets.Effects.Hose",
+            "UnityStandardAssets.Effects.ParticleSystemMultiplier",
+            "UnityStandardAssets.Effects.SmokeParticles",
+            "UnityStandardAssets.Effects.WaterHoseParticles",
+            "UnityStandardAssets.Utility.ActivateTrigger",
+            "UnityStandardAssets.Utility.AutoMoveAndRotate",
+            "UnityStandardAssets.Utility.DragRigidbody",
+            "UnityStandardAssets.Utility.DynamicShadowSettings",
+            "UnityStandardAssets.Utility.FollowTarget",
+            "UnityStandardAssets.Utility.FPSCounter",
+            "UnityStandardAssets.Utility.ObjectResetter",
+            "UnityStandardAssets.Utility.ParticleSystemDestroyer",
+            "UnityStandardAssets.Utility.SimpleActivatorMenu",
+            "UnityStandardAssets.Utility.SimpleMouseRotator",
+            "UnityStandardAssets.Utility.SmoothFollow",
+            "UnityStandardAssets.Utility.TimedObjectActivator",
+            "UnityStandardAssets.Utility.TimedObjectDestructor",
+            "UnityStandardAssets.Utility.WaypointCircuit",
+            "UnityStandardAssets.Utility.WaypointProgressTracker",
+            "UnityStandardAssets.Vehicles.Aeroplane.AeroplaneAiControl",
+            "UnityStandardAssets.Vehicles.Aeroplane.AeroplaneAudio",
+            "UnityStandardAssets.Vehicles.Aeroplane.AeroplaneController",
+            "UnityStandardAssets.Vehicles.Aeroplane.AeroplaneControlSurfaceAnimator",
+            "UnityStandardAssets.Vehicles.Aeroplane.AeroplanePropellerAnimator",
+            "UnityStandardAssets.Vehicles.Aeroplane.AeroplaneUserControl2Axis",
+            "UnityStandardAssets.Vehicles.Aeroplane.AeroplaneUserControl4Axis",
+            "UnityStandardAssets.Vehicles.Aeroplane.JetParticleEffect",
+            "UnityStandardAssets.Vehicles.Aeroplane.LandingGear",
+            "UnityStandardAssets.Vehicles.Car.BrakeLight",
+            "UnityStandardAssets.Vehicles.Car.CarAIControl",
+            "UnityStandardAssets.Vehicles.Car.CarAudio",
+            "UnityStandardAssets.Vehicles.Car.CarController",
+            "UnityStandardAssets.Vehicles.Car.CarSelfRighting",
+            "UnityStandardAssets.Vehicles.Car.CarUserControl",
+            "UnityStandardAssets.Vehicles.Car.Mudguard",
+            "UnityStandardAssets.Vehicles.Car.SkidTrail",
+            "UnityStandardAssets.Vehicles.Car.Suspension",
+            "UnityStandardAssets.Vehicles.Car.WheelEffects",
+            "AlphaButtonClickMask",
+            "EventSystemChecker",
             "VirtualMarketplaceItem"
+        };
+
+        static readonly string[] ComponentTypeWhiteListSdk3 = new string[]
+        {
+            "VRC.SDK3.VRCDestructibleStandard",
+            "VRC.SDK3.Components.VRCVisualDamage",
+            "VRC.SDK3.Components.VRCAvatarPedestal",
+            "VRC.SDK3.Components.VRCPickup",
+            "VRC.SDK3.Components.VRCPortalMarker",
+            "VRC.SDK3.Components.VRCSpatialAudioSource",
+            "VRC.SDK3.Components.VRCMirrorReflection",
+            "VRC.SDK3.Components.VRCSceneDescriptor",
+            "VRC.SDK3.Components.VRCStation",
+            "VRC.SDK3.Components.VRCUiShape",
+            "VRC.Udon.UdonBehaviour",
+            "UnityEngine.Animations.AimConstraint",
+            "UnityEngine.Animations.LookAtConstraint",
+            "UnityEngine.Animations.ParentConstraint",
+            "UnityEngine.Animations.PositionConstraint",
+            "UnityEngine.Animations.RotationConstraint",
+            "UnityEngine.Animations.ScaleConstraint",
+            "UnityEngine.ParticleSystemForceField",
         };
 
         public static readonly string[] ShaderWhiteList = new string[]
@@ -420,40 +449,82 @@ namespace VRCSDK2.Validation
             "UI/Default",
         };
 
-        private static List<int> scannedObjects = new List<int>();
+        private static readonly HashSet<int> scannedObjects = new HashSet<int>();
 
-
-        public static IEnumerator RemoveIllegalComponentsEnumerator(GameObject target, bool retry = true)
+        private static void ConfigureWhiteList(WhiteListConfiguration config)
         {
-            return ValidationUtils.RemoveIllegalComponentsEnumerator(target, ValidationUtils.WhitelistedTypes("world", ComponentTypeWhiteList), retry, true);
-        }
-
-        public static IEnumerator RemoveIllegalComponentsEnumerator(GameObject[] targets, bool retry = true)
-        {
-            foreach(GameObject target in targets)
-                yield return ValidationUtils.RemoveIllegalComponentsEnumerator(target, ValidationUtils.WhitelistedTypes("world", ComponentTypeWhiteList), retry, true);
-        }
-
-        public static IEnumerable<Component> FindIllegalComponents(GameObject target)
-        {
-            return ValidationUtils.FindIllegalComponents(target, ValidationUtils.WhitelistedTypes("world", ComponentTypeWhiteList));
-        }
-
-        public static void ScanGameobject(GameObject target)
-        {
-            if(scannedObjects.Contains(target.GetInstanceID()))
+            if (ComponentTypeWhiteListConfiguration == config ||
+                config == WhiteListConfiguration.Unchanged)
+            {
                 return;
+            }
 
-            ValidationUtils.RemoveIllegalComponents(target, ValidationUtils.WhitelistedTypes("world", ComponentTypeWhiteList));
+            List<string> concatenation = new List<string>();
+            concatenation.AddRange(ComponentTypeWhiteListCommon);
 
-            scannedObjects.Add(target.GetInstanceID());
+            switch(config)
+            {
+                case WhiteListConfiguration.VRCSDK2:
+                    concatenation.AddRange(ComponentTypeWhiteListSdk2);
+                    break;
+                case WhiteListConfiguration.VRCSDK3:
+                    concatenation.AddRange(ComponentTypeWhiteListSdk3);
+                    break;
+            }
+
+            ComponentTypeWhiteListConfiguration = config;
+            ComponentTypeWhiteList = concatenation.ToArray();
         }
 
-        public static void ClearScannedGameobjectCache()
+        [PublicAPI]
+        public static void RemoveIllegalComponents(IEnumerable<GameObject> targets, WhiteListConfiguration config, bool retry = true)
+        {
+            ConfigureWhiteList(config);
+            HashSet<Type> whitelist = ValidationUtils.WhitelistedTypes("world" + config, ComponentTypeWhiteList);
+            foreach(GameObject target in targets)
+            {
+                ValidationUtils.RemoveIllegalComponents(target, whitelist, retry, true);
+                AddScanned(target);
+            }
+        }
+
+        private static void AddScanned(GameObject obj)
+        {
+            if (obj == null)
+                return;
+            if (!scannedObjects.Contains(obj.GetInstanceID()))
+                scannedObjects.Add(obj.GetInstanceID());
+            for (int idx = 0; idx < obj.transform.childCount; ++idx)
+                AddScanned(obj.transform.GetChild(idx)?.gameObject);
+        }
+
+        private static bool WasScanned(GameObject obj)
+        {
+            return scannedObjects.Contains(obj.GetInstanceID());
+        }
+
+        [PublicAPI]
+        public static void ScanGameObject(GameObject target, WhiteListConfiguration config)
+        {
+            if (WasScanned(target))
+            {
+                return;
+            }
+
+            ConfigureWhiteList(config);
+            HashSet<Type> whitelist = ValidationUtils.WhitelistedTypes("world", ComponentTypeWhiteList);
+            ValidationUtils.RemoveIllegalComponents(target, whitelist);
+
+            AddScanned(target);
+        }
+
+        [PublicAPI]
+        public static void ClearScannedGameObjectCache()
         {
             scannedObjects.Clear();
         }
 
+        [PublicAPI]
         public static IEnumerable<Shader> FindIllegalShaders(GameObject target)
         {
             return ShaderValidation.FindIllegalShaders(target, ShaderWhiteList);

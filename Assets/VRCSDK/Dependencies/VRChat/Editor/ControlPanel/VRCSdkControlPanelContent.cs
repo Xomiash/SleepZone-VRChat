@@ -178,7 +178,12 @@ public partial class VRCSdkControlPanel : EditorWindow
         if (avatars == null || uploadedAvatars == null )
             return;
 
-        avatars.RemoveAll(a => a == null || a.name == null || uploadedAvatars.Any(a2 => a2.id == a.id));
+        avatars.RemoveAll(a => a == null || uploadedAvatars.Any(a2 => a2.id == a.id));
+        foreach(var avatar in avatars)
+        {
+            if (string.IsNullOrEmpty(avatar.name))
+                avatar.name = "(unnamed)";
+        }
 
         if (avatars.Count > 0)
         {
@@ -189,6 +194,8 @@ public partial class VRCSdkControlPanel : EditorWindow
 
     static void DownloadImage(string id, string url)
     {
+        if (string.IsNullOrEmpty(url))
+            return;
         if (ImageCache.ContainsKey(id) && ImageCache[id] != null)
             return;
 
@@ -226,13 +233,24 @@ public partial class VRCSdkControlPanel : EditorWindow
 
         if (APIUser.IsLoggedInWithCredentials && uploadedWorlds != null && uploadedAvatars != null)
         {
-            contentScrollPos = EditorGUILayout.BeginScrollView(contentScrollPos);
-            GUIStyle descriptionStyle = new GUIStyle(EditorStyles.wordWrappedLabel);
-            descriptionStyle.wordWrap = true;
-            bool expandedLayout = (position.width > MAX_ALL_INFORMATION_WIDTH);
+
+            bool expandedLayout = false; // (position.width > MAX_ALL_INFORMATION_WIDTH);    // uncomment for future wide layouts
+
+            if (!expandedLayout)
+            {
+                EditorGUILayout.BeginHorizontal();
+                GUILayout.FlexibleSpace();
+            }
+
+            GUILayout.BeginHorizontal();
+
+            GUILayout.BeginVertical(searchBarStyle);
 
             EditorGUILayout.BeginHorizontal();
-            searchString = EditorGUILayout.TextField(searchString, GUI.skin.FindStyle("SearchTextField"));
+
+            float searchFieldShrinkOffset = 30f;
+            GUILayoutOption layoutOption = (expandedLayout ? GUILayout.Width(position.width - searchFieldShrinkOffset) : GUILayout.Width(SdkWindowWidth - searchFieldShrinkOffset));
+            searchString = EditorGUILayout.TextField(searchString, GUI.skin.FindStyle("SearchTextField"), layoutOption);
             GUIStyle searchButtonStyle = searchString == string.Empty
                 ? GUI.skin.FindStyle("SearchCancelButtonEmpty")
                 : GUI.skin.FindStyle("SearchCancelButton");
@@ -242,6 +260,23 @@ public partial class VRCSdkControlPanel : EditorWindow
                 GUI.FocusControl(null);
             }
             EditorGUILayout.EndHorizontal();
+            EditorGUILayout.EndVertical();
+            EditorGUILayout.EndHorizontal();
+
+            if (!expandedLayout)
+            {
+                GUILayout.FlexibleSpace();
+                EditorGUILayout.EndHorizontal();
+
+                GUILayout.BeginHorizontal();
+                GUILayout.FlexibleSpace();
+            }
+
+            layoutOption = (expandedLayout ? GUILayout.Width(position.width) : GUILayout.Width(SdkWindowWidth));
+            contentScrollPos = EditorGUILayout.BeginScrollView(contentScrollPos, layoutOption);
+
+            GUIStyle descriptionStyle = new GUIStyle(EditorStyles.wordWrappedLabel);
+            descriptionStyle.wordWrap = true;
 
             if (uploadedWorlds.Count > 0)
             {
@@ -500,7 +535,11 @@ public partial class VRCSdkControlPanel : EditorWindow
             }
 
             EditorGUILayout.EndScrollView();
-
+            if (!expandedLayout)
+            {
+                GUILayout.FlexibleSpace();
+                GUILayout.EndHorizontal();
+            }
             if ((updatedContent) && (null != window)) window.Reset();
 
             return true;
@@ -513,6 +552,10 @@ public partial class VRCSdkControlPanel : EditorWindow
 
     void ShowContent()
     {
+        GUILayout.BeginHorizontal();
+        GUILayout.FlexibleSpace();
+        GUILayout.BeginVertical();
+
         if (uploadedWorlds == null || uploadedAvatars == null)
         {
             if (uploadedWorlds == null)
@@ -545,6 +588,10 @@ public partial class VRCSdkControlPanel : EditorWindow
             EditorGUILayout.Space();
             GUILayout.EndVertical();
         }
+
+        GUILayout.EndVertical();
+        GUILayout.FlexibleSpace();
+        GUILayout.EndHorizontal();
 
         OnGUIUserInfo();
     }

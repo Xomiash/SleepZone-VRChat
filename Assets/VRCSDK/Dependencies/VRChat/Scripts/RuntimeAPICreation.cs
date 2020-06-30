@@ -12,6 +12,8 @@ using UnityEditor;
 
 namespace VRCSDK2
 {
+#if UNITY_EDITOR
+
     public class RuntimeAPICreation : MonoBehaviour
     {
         public VRC.Core.PipelineManager pipelineManager;
@@ -43,7 +45,6 @@ namespace VRCSDK2
 
         protected bool isUpdate { get { return pipelineManager.completedSDKPipeline; } }
 
-#if UNITY_EDITOR
         protected void Start()
         {
             if (!Application.isEditor || !Application.isPlaying)
@@ -58,7 +59,7 @@ namespace VRCSDK2
             LoadUploadRetryStateFromCache();
 
             forceNewFileCreation = UnityEditor.EditorPrefs.GetBool("forceNewFileCreation", true);
-            useFileApi = UnityEditor.EditorPrefs.GetBool("useFileApi", VRC.Core.ApiFile.kDefaultUseFileAPI);
+            useFileApi = UnityEditor.EditorPrefs.GetBool("useFileApi", false);
 
             API.SetOnlineMode(true);
         }
@@ -72,6 +73,10 @@ namespace VRCSDK2
                 {
                     cancelRequested = true;
                 }
+
+                if (EditorApplication.isPaused)
+                    EditorApplication.isPaused = false;
+
             }
         }
 
@@ -146,9 +151,7 @@ namespace VRCSDK2
 
         protected string GetUploadRetryStateValue(string key)
         {
-            string val = "";
-            mRetryState.TryGetValue(key, out val);
-            return val;
+            return mRetryState.ContainsKey(key) ? mRetryState[key] : "";
         }
 
         protected virtual void DisplayUpdateCompletedDialog(string contentUrl=null)
@@ -247,8 +250,7 @@ namespace VRCSDK2
         {
             if (string.IsNullOrEmpty(filename))
                 yield break;
-
-            Debug.Log("Uploading " + fileType + "(" + filename + ") ...");
+            VRC.Core.Logger.Log("Uploading " + fileType + "(" + filename + ") ...", DebugLevel.All);
             SetUploadProgress("Uploading " + fileType + "...", "", 0.0f);
 
             string fileId = GetUploadRetryStateValue(filename);
@@ -256,13 +258,17 @@ namespace VRCSDK2
                 fileId = isUpdate ? ApiFile.ParseFileIdFromFileAPIUrl(existingFileUrl) : "";
             string errorStr = "";
             string newFileUrl = "";
+
+
             yield return StartCoroutine(ApiFileHelper.Instance.UploadFile(filename, forceNewFileCreation ? "" : fileId, friendlyFilename,
                 delegate (ApiFile apiFile, string message)
                 {
                     newFileUrl = apiFile.GetFileURL();
-
-                    Debug.Log(fileType + " upload succeeded: " + message + " (" + filename +
-                              ") => " + apiFile.ToString());
+                    if (VRC.Core.Logger.DebugLevelIsEnabled(DebugLevel.API))
+                        VRC.Core.Logger.Log(fileType + " upload succeeded: " + message + " (" + filename +
+                              ") => " + apiFile.ToString(), DebugLevel.API);
+                    else
+                        VRC.Core.Logger.Log(fileType + " upload succeeded ", DebugLevel.Always);
                 },
                 delegate (ApiFile apiFile, string error)
                 {
@@ -331,6 +337,7 @@ namespace VRCSDK2
             string lastBuiltID = UnityEditor.EditorPrefs.GetString("lastBuiltAssetBundleBlueprintID", "");
             return !string.IsNullOrEmpty(lastBuiltID) && lastBuiltID == blueprintID;
         }
+    }
 #endif
-        }
+
 }

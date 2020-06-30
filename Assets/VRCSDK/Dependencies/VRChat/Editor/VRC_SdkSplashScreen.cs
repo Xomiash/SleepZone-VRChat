@@ -1,4 +1,5 @@
 ﻿#define COMMUNITY_LABS_SDK
+
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -20,12 +21,19 @@ namespace VRCSDK2
         private static void DoSplashScreen()
         {
             EditorApplication.update -= DoSplashScreen;
-            if (!EditorPrefs.HasKey("VRCSDK_ShowSplashScreen"))
-            {
-                EditorPrefs.SetBool("VRCSDK_ShowSplashScreen", true);
-            }
-            if (EditorPrefs.GetBool("VRCSDK_ShowSplashScreen"))
-                OpenSplashScreen();
+            if (EditorApplication.isPlaying)
+                return;
+
+            #if UDON
+                if (!EditorPrefs.GetBool("VRCSDK_ShowedSplashScreenFirstTime", false))
+                {
+                    OpenSplashScreen();
+                    EditorPrefs.SetBool("VRCSDK_ShowedSplashScreenFirstTime", true);
+                }
+                else
+            #endif
+                if (EditorPrefs.GetBool("VRCSDK_ShowSplashScreen", true))
+                    OpenSplashScreen();
         }
 
         private static GUIStyle vrcSdkHeader;
@@ -55,10 +63,12 @@ namespace VRCSDK2
             {
                 normal =
                     {
-#if COMMUNITY_LABS_SDK
-                        background = Resources.Load("vrcSdkHeaderWithCommunityLabs") as Texture2D,
+#if UDON
+                            background = Resources.Load("vrcSdkSplashUdon1") as Texture2D,
+#elif COMMUNITY_LABS_SDK
+                            background = Resources.Load("vrcSdkHeaderWithCommunityLabs") as Texture2D,
 #else
-                        background = Resources.Load("vrcSdkHeader") as Texture2D,
+                            background = Resources.Load("vrcSdkHeader") as Texture2D,
 #endif
                         textColor = Color.white
                     },
@@ -69,7 +79,11 @@ namespace VRCSDK2
             {
                 normal =
                 {
-                    background = Resources.Load("vrcSdkBottomHeader") as Texture2D,
+#if UDON
+                        background = Resources.Load("vrcSdkSplashUdon2") as Texture2D,
+#else
+                        background = Resources.Load("vrcSdkBottomHeader") as Texture2D,
+#endif
 
                     textColor = Color.white
                 },
@@ -81,19 +95,23 @@ namespace VRCSDK2
         public void OnGUI()
         {
             GUILayout.Box("", vrcSdkHeader);
-#if COMMUNITY_LABS_SDK
-            vrcHeaderLearnMoreButton = EditorStyles.miniButton;
-            vrcHeaderLearnMoreButton.normal.textColor = Color.black;
-            vrcHeaderLearnMoreButton.fontSize = 12;
-            vrcHeaderLearnMoreButton.border = new RectOffset(10, 10, 10, 10);
-            Texture2D texture = UnityEditor.AssetDatabase.GetBuiltinExtraResource<Texture2D>("UI/Skin/UISprite.psd");
-            vrcHeaderLearnMoreButton.normal.background = texture;
-            vrcHeaderLearnMoreButton.active.background = texture;
+
+                vrcHeaderLearnMoreButton = EditorStyles.miniButton;
+                vrcHeaderLearnMoreButton.normal.textColor = Color.black;
+                vrcHeaderLearnMoreButton.fontSize = 12;
+                vrcHeaderLearnMoreButton.border = new RectOffset(10, 10, 10, 10);
+                Texture2D texture = UnityEditor.AssetDatabase.GetBuiltinExtraResource<Texture2D>("UI/Skin/UISprite.psd");
+                vrcHeaderLearnMoreButton.normal.background = texture;
+                vrcHeaderLearnMoreButton.active.background = texture;
+#if UDON
+            if (GUI.Button(new Rect(20, 160, 185, 25), "Get Started with Udon", vrcHeaderLearnMoreButton))
+                    Application.OpenURL("https://ask.vrchat.com/t/getting-started-with-udon/80");
+#elif COMMUNITY_LABS_SDK
             if (GUI.Button(new Rect(20, 140, 180, 40), "Please Read", vrcHeaderLearnMoreButton))
-            {
-                Application.OpenURL(CommunityLabsConstants.COMMUNITY_LABS_DOCUMENTATION_URL);
-            }
+                    Application.OpenURL(CommunityLabsConstants.COMMUNITY_LABS_DOCUMENTATION_URL);
 #endif
+
+
             GUILayout.Space(4);
             GUILayout.BeginHorizontal();
             GUI.backgroundColor = Color.gray;
@@ -124,9 +142,9 @@ namespace VRCSDK2
             }
             GUI.backgroundColor = Color.white;
             GUILayout.EndHorizontal();
-            GUILayout.Space(4);
+            GUILayout.Space(2);
 
-            changeLogScroll = GUILayout.BeginScrollView(changeLogScroll, GUILayout.Width(390));
+            changeLogScroll = GUILayout.BeginScrollView(changeLogScroll, false, false, GUIStyle.none, GUI.skin.verticalScrollbar, GUILayout.Width(395));
 
             GUILayout.Label(
     @"Changelog:
@@ -209,10 +227,19 @@ the window and scales the contents appropriately"
             vrcBottomHeaderLearnMoreButton.border = new RectOffset(10, 10, 10, 10);
             vrcBottomHeaderLearnMoreButton.normal.background = texture;
             vrcBottomHeaderLearnMoreButton.active.background = texture;
-            if (GUI.Button(new Rect(80, 540, 240, 30), "Learn how to create for VRChat Quest!", vrcBottomHeaderLearnMoreButton))
-            {
-                Application.OpenURL("https://docs.vrchat.com/docs/creating-content-for-the-oculus-quest");
-            }
+
+#if UDON
+            if (GUI.Button(new Rect(110, 520, 200, 25), "More Info and Examples", vrcBottomHeaderLearnMoreButton))
+                Application.OpenURL("https://ask.vrchat.com/c/udon/5 ");
+#else
+            if (GUI.Button(new Rect(110, 525, 180, 42), "Click Here to see great\nassets for VRChat creation", vrcBottomHeaderLearnMoreButton))
+                Application.OpenURL("https://assetstore.unity.com/lists/vrchat-picks-125734?aid=1101l7yuQ");
+#endif
+
+            //if (GUI.Button(new Rect(80, 540, 240, 30), "Learn how to create for VRChat Quest!", vrcBottomHeaderLearnMoreButton))
+            //{
+            //    Application.OpenURL("https://docs.vrchat.com/docs/creating-content-for-the-oculus-quest");
+            //}
 
             GUILayout.FlexibleSpace();
 

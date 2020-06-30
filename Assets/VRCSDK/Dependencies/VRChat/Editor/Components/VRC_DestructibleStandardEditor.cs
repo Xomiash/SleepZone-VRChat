@@ -1,7 +1,7 @@
 ﻿using UnityEngine;
 using System.Collections;
 using UnityEditor;
-using VRCSDK2;
+using VRC.SDKBase;
 
 [CustomEditor(typeof(VRC_DestructibleStandard))]
 [CanEditMultipleObjects]
@@ -40,16 +40,16 @@ public class VRC_DestructibleStandardEditor : Editor
 		EditorGUILayout.PropertyField(healable, new GUIContent("Is Healable"));
 
 		EditorGUILayout.PropertyField(onDamagedTrigger, new GUIContent("On Damaged Trigger"));
-		VRC_EditorTools.DrawTriggerActionCallback("On Damaged Action", ds.onDamagedTrigger, ds.onDamagedEvent);
+        VRCSDK2.VRC_EditorTools.DrawTriggerActionCallback("On Damaged Action", ds.onDamagedTrigger, ds.onDamagedEvent);
 
 		EditorGUILayout.PropertyField(onDestroyedTrigger, new GUIContent("On Destructed Trigger"));
-		VRC_EditorTools.DrawTriggerActionCallback("On Destructed Action", ds.onDestructedTrigger, ds.onDestructedEvent);
+		VRCSDK2.VRC_EditorTools.DrawTriggerActionCallback("On Destructed Action", ds.onDestructedTrigger, ds.onDestructedEvent);
 
 		EditorGUILayout.PropertyField(onHealedTrigger, new GUIContent("On Healed Trigger"));
-		VRC_EditorTools.DrawTriggerActionCallback("On Healed Action", ds.onHealedTrigger, ds.onHealedEvent);
+		VRCSDK2.VRC_EditorTools.DrawTriggerActionCallback("On Healed Action", ds.onHealedTrigger, ds.onHealedEvent);
 
 		EditorGUILayout.PropertyField(onFullHealedTrigger, new GUIContent("On Full Healed Trigger"));
-		VRC_EditorTools.DrawTriggerActionCallback("On Full Healed Action", ds.onFullHealedTrigger, ds.onFullHealedEvent);
+		VRCSDK2.VRC_EditorTools.DrawTriggerActionCallback("On Full Healed Action", ds.onFullHealedTrigger, ds.onFullHealedEvent);
 
 		// Apply changes to the serializedProperty - always do this in the end of OnInspectorGUI.
 		serializedObject.ApplyModifiedProperties ();

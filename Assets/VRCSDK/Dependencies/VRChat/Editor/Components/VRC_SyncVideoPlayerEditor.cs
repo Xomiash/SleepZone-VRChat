@@ -1,4 +1,6 @@
-﻿using System.Collections;
+﻿#if VRC_SDK_VRCSDK2
+
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor;
@@ -99,3 +101,4 @@ public class SyncVideoPlayerEditor : Editor
         sourceList.drawHeaderCallback = (Rect rect) => EditorGUI.LabelField(rect, "Videos");
     }
 }
+#endif

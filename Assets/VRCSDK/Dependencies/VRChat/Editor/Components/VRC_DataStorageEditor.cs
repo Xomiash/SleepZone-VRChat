@@ -1,4 +1,5 @@
-﻿#if UNITY_EDITOR
+﻿#if VRC_SDK_VRCSDK2
+#if UNITY_EDITOR
 using UnityEditor;
 using UnityEngine;
 using System.Linq;
@@ -19,23 +20,23 @@ namespace VRCSDK2
             SerializedProperty valueProperty = null;
             switch (typeProperty.enumValueIndex)
             {
-                case (int)VRC_DataStorage.VrcDataType.Bool:
+                case (int)VRCSDK2.VRC_DataStorage.VrcDataType.Bool:
                     valueProperty = property.FindPropertyRelative("valueBool");
                     break;
-                case (int)VRC_DataStorage.VrcDataType.Float:
+                case (int)VRCSDK2.VRC_DataStorage.VrcDataType.Float:
                     valueProperty = property.FindPropertyRelative("valueFloat");
                     break;
-                case (int)VRC_DataStorage.VrcDataType.Int:
+                case (int)VRCSDK2.VRC_DataStorage.VrcDataType.Int:
                     valueProperty = property.FindPropertyRelative("valueInt");
                     break;
-                case (int)VRC_DataStorage.VrcDataType.String:
+                case (int)VRCSDK2.VRC_DataStorage.VrcDataType.String:
                     valueProperty = property.FindPropertyRelative("valueString");
                     break;
-                case (int)VRC_DataStorage.VrcDataType.SerializeObject:
+                case (int)VRCSDK2.VRC_DataStorage.VrcDataType.SerializeObject:
                     valueProperty = property.FindPropertyRelative("serializeComponent");
                     break;
-                case (int)VRC_DataStorage.VrcDataType.None:
-                case (int)VRC_DataStorage.VrcDataType.SerializeBytes:
+                case (int)VRCSDK2.VRC_DataStorage.VrcDataType.None:
+                case (int)VRCSDK2.VRC_DataStorage.VrcDataType.SerializeBytes:
                     break;
             }
 
@@ -53,21 +54,21 @@ namespace VRCSDK2
 
             switch (mirrorProperty.enumValueIndex)
             {
-                case (int)VRC_DataStorage.VrcDataMirror.None:
+                case (int)VRCSDK2.VRC_DataStorage.VrcDataMirror.None:
                     if (valueProperty == null)
-                        VRC_EditorTools.FilteredEnumPopup<VRC_DataStorage.VrcDataType>(typeValueRect, typeProperty, t => true);
+                        VRC_EditorTools.FilteredEnumPopup<VRCSDK2.VRC_DataStorage.VrcDataType>(typeValueRect, typeProperty, t => true);
                     else
                     {
-                        VRC_EditorTools.FilteredEnumPopup<VRC_DataStorage.VrcDataType>(typeRect, typeProperty, t => true);
+                        VRC_EditorTools.FilteredEnumPopup<VRCSDK2.VRC_DataStorage.VrcDataType>(typeRect, typeProperty, t => true);
                         EditorGUI.PropertyField(valueRect, valueProperty, GUIContent.none);
                     }
                     break;
-                case (int)VRC_DataStorage.VrcDataMirror.SerializeComponent:
-                    typeProperty.enumValueIndex = (int)VRC_DataStorage.VrcDataType.SerializeObject;
+                case (int)VRCSDK2.VRC_DataStorage.VrcDataMirror.SerializeComponent:
+                    typeProperty.enumValueIndex = (int)VRCSDK2.VRC_DataStorage.VrcDataType.SerializeObject;
                     EditorGUI.PropertyField(typeValueRect, valueProperty, GUIContent.none);
                     break;
                 default:
-                    VRC_EditorTools.FilteredEnumPopup<VRC_DataStorage.VrcDataType>(typeValueRect, typeProperty, t => true);
+                    VRC_EditorTools.FilteredEnumPopup<VRCSDK2.VRC_DataStorage.VrcDataType>(typeValueRect, typeProperty, t => true);
                     break;
             }
 
@@ -88,4 +89,5 @@ namespace VRCSDK2
         }
     }
 }
+#endif
 #endif

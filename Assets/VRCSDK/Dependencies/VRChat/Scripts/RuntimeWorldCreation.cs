@@ -15,6 +15,7 @@ using UnityEditor;
 
 namespace VRCSDK2
 {
+#if UNITY_EDITOR
     public class RuntimeWorldCreation : RuntimeAPICreation
     {
         public GameObject waitingPanel;
@@ -65,7 +66,6 @@ namespace VRCSDK2
         public static bool IsCurrentWorldPubliclyPublished = false;
         public static bool HasExceededPublishLimit = false;
 
-#if UNITY_EDITOR
         new void Start()
         {
             if (!Application.isEditor || !Application.isPlaying)
@@ -78,7 +78,7 @@ namespace VRCSDK2
             IsCurrentWorldPubliclyPublished = false;
 
 
-            var desc = pipelineManager.GetComponent<VRC_SceneDescriptor>();
+            var desc = pipelineManager.GetComponent<VRC.SDKBase.VRC_SceneDescriptor>();
             desc.PositionPortraitCamera(imageCapture.shotCamera.transform);
 
             Application.runInBackground = true;
@@ -126,14 +126,14 @@ namespace VRCSDK2
             model.Fetch(null, null,
                 (c) =>
                 {
-                    Debug.Log("<color=magenta>Updating an existing world.</color>");
+                    VRC.Core.Logger.Log("<color=magenta>Updating an existing world.</color>", DebugLevel.All);
                     worldRecord = c.Model as ApiWorld;
                     pipelineManager.completedSDKPipeline = !string.IsNullOrEmpty(worldRecord.authorId);
                     GetUserUploadInformationAndSetupUI(model.id);
                 },
                 (c) =>
                 {
-                    Debug.Log("<color=magenta>World record not found, creating a new world.</color>");
+                    VRC.Core.Logger.Log("<color=magenta>World record not found, creating a new world.</color>", DebugLevel.All);
                     worldRecord = new ApiWorld { capacity = 8 };
                     pipelineManager.completedSDKPipeline = false;
                     worldRecord.id = pipelineManager.blueprintId;
@@ -389,17 +389,17 @@ namespace VRCSDK2
 
             if (!string.IsNullOrEmpty(pluginPath) && System.IO.File.Exists(pluginPath))
             {
-                Debug.Log("Found plugin path. Preparing to upload!");
+                VRC.Core.Logger.Log("Found plugin path. Preparing to upload!", DebugLevel.All);
                 PreparePluginPathForS3(pluginPath, blueprintId, version, ApiWorld.VERSION);
             }
             else
             {
-                Debug.Log("Did not find plugin path. No upload occuring!");
+                VRC.Core.Logger.Log("Did not find plugin path. No upload occuring!", DebugLevel.All);
             }
 
             if (!string.IsNullOrEmpty(unityPackagePath) && System.IO.File.Exists(unityPackagePath))
             {
-                Debug.Log("Found unity package path. Preparing to upload!");
+                VRC.Core.Logger.Log("Found unity package path. Preparing to upload!", DebugLevel.All);
                 PrepareUnityPackageForS3(unityPackagePath, blueprintId, version, ApiWorld.VERSION);
             }
 
@@ -423,6 +423,8 @@ namespace VRCSDK2
 
             if (caughtInvalidInput)
                 yield break;
+
+            VRC.Core.Logger.Log("Starting upload", DebugLevel.Always);
 
             // upload unity package
             if (!string.IsNullOrEmpty(uploadUnityPackagePath))
@@ -618,7 +620,7 @@ namespace VRCSDK2
                     ApiWorld savedBP = (ApiWorld)c.Model;
                     pipelineManager.blueprintId = savedBP.id;
                     UnityEditor.EditorPrefs.SetString("blueprintID-" + pipelineManager.GetInstanceID().ToString(), savedBP.id);
-                    Debug.Log("Setting blueprintID on pipeline manager and editor prefs");
+                    VRC.Core.Logger.Log("Setting blueprintID on pipeline manager and editor prefs", DebugLevel.All);
                     doneUploading = true;
                 },
                 (c) => { doneUploading = true; Debug.LogError(c.Error); });
@@ -707,8 +709,8 @@ namespace VRCSDK2
             UnityEditor.EditorPrefs.DeleteKey("currentBuildingAssetBundlePath");
             UnityEditor.EditorPrefs.DeleteKey("externalPluginPath");
         }
+    }
 #endif
-                }
-            }
+}
 
 

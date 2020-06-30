@@ -1,4 +1,5 @@
-﻿#if UNITY_EDITOR
+﻿#if VRC_SDK_VRCSDK2
+#if UNITY_EDITOR
 using System.IO;
 using UnityEditor;
 using UnityEngine;
@@ -8,7 +9,7 @@ using System.Linq;
 
 namespace VRCSDK2
 {
-    [CustomEditor(typeof(VRC_WebPanel))]
+    [CustomEditor(typeof(VRCSDK2.VRC_WebPanel))]
     public class VRC_WebPanelEditor : Editor
     {
         private void InspectorField(string propertyName, string humanName)
@@ -18,7 +19,6 @@ namespace VRCSDK2
         }
         
         bool showFiles = false;
-        bool showHelp = true;
         System.Collections.Generic.List<string> directories = null;
         System.Collections.Generic.List<string> files = null;
 
@@ -29,15 +29,14 @@ namespace VRCSDK2
 
             EditorGUILayout.BeginVertical();
 
-            EditorGUILayout.HelpBox("Do not play any videos with Web Panels, use VRC_VideoPlayerSync instead!", MessageType.Error);
+            EditorGUILayout.HelpBox("Do not play any videos with Web Panels, use VRC_SyncVideoPlayer instead!", MessageType.Error);
 
-            showHelp = EditorGUILayout.Toggle("Show Help", showHelp);
             EditorGUILayout.Space();
 
             InspectorField("proximity", "Proximity for Interactivity");
             EditorGUILayout.Space();
 
-            VRC_WebPanel web = (VRC_WebPanel)target;
+            VRCSDK2.VRC_WebPanel web = (VRCSDK2.VRC_WebPanel)target;
 
             if (Application.isPlaying)
             {
@@ -67,7 +66,7 @@ namespace VRCSDK2
                 {
                     RenderWebRootSelector(serializedObject, "defaultUrl", "Start Page");
 
-                    if (showHelp)
+                    if (VRCSettings.Get().DisplayHelpBoxes)
                     {
                         EditorGUILayout.HelpBox("Javascript API bindings are called with engine.call('methodName', ...), which returns a promise-like object.", MessageType.Info);
                         EditorGUILayout.HelpBox("Javascript may call ListBindings() to discover available API bindings.", MessageType.Info);
@@ -213,4 +212,5 @@ namespace VRCSDK2
         }
     }
 }
+#endif
 #endif

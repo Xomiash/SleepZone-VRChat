@@ -5,7 +5,7 @@ using UnityEditor;
 using UnityEngine;
 using VRC;
 using VRC.Core;
-using VRCSDK2;
+using VRC.SDKBase;
 
 public partial class VRCSdkControlPanel : EditorWindow
 {

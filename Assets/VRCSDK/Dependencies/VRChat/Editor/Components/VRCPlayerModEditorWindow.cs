@@ -1,4 +1,5 @@
-﻿// C# example:
+﻿#if VRC_SDK_VRCSDK2
+
 using UnityEngine;
 using UnityEditor;
 
@@ -32,3 +33,5 @@ public class VRCPlayerModEditorWindow : EditorWindow {
 		}
 	}
 }
+
+#endif

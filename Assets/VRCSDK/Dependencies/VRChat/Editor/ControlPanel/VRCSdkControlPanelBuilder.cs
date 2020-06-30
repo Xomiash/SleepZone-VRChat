@@ -1,15 +1,21 @@
-﻿using System.Collections;
+﻿
+using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-
 using UnityEngine;
 using UnityEditor;
-using VRC;
-using VRC.Core;
+using UnityEditor.SceneManagement;
+using UnityEngine.SceneManagement;
+#if UDON
+using VRC.Udon;
+using VRC.Udon.Common.Interfaces;
+#endif
 using VRCSDK2.Validation;
 using VRCSDK2.Validation.Performance;
 using VRCSDK2.Validation.Performance.Stats;
+using Object = UnityEngine.Object;
 
 public partial class VRCSdkControlPanel : EditorWindow
 {
@@ -46,12 +52,14 @@ public partial class VRCSdkControlPanel : EditorWindow
         public string issueText;
         public System.Action showThisIssue;
         public System.Action fixThisIssue;
+        public PerformanceRating performanceRating;
 
-        public Issue(string text, System.Action show, System.Action fix)
+        public Issue(string text, System.Action show, System.Action fix, PerformanceRating rating = PerformanceRating.None)
         {
             issueText = text;
             showThisIssue = show;
             fixThisIssue = fix;
+            performanceRating = rating;
         }
 
         public class Equality : IEqualityComparer<Issue>, IComparer<Issue>
@@ -75,7 +83,7 @@ public partial class VRCSdkControlPanel : EditorWindow
     Dictionary<Object, List<Issue>> GUIWarnings = new Dictionary<Object, List<Issue>>();
     Dictionary<Object, List<Issue>> GUIInfos = new Dictionary<Object, List<Issue>>();
     Dictionary<Object, List<Issue>> GUILinks = new Dictionary<Object, List<Issue>>();
-    Dictionary<Object, List<KeyValuePair<string, PerformanceRating>>> GUIStats = new Dictionary<Object, List<KeyValuePair<string, PerformanceRating>>>();
+    Dictionary<Object, List<Issue>> GUIStats = new Dictionary<Object, List<Issue>>();
 
     private string customNamespace;
 
@@ -119,22 +127,23 @@ public partial class VRCSdkControlPanel : EditorWindow
         AddToReport(GUILinks, subject, output + "\n" + link, null, null);
     }
 
-    void OnGUIStat(Object subject, string output, PerformanceRating rating)
+    void OnGUIStat(Object subject, string output, PerformanceRating rating, System.Action show, System.Action fix)
     {
         if (subject == null)
             subject = this;
         if (!GUIStats.ContainsKey(subject))
-            GUIStats.Add(subject, new List<KeyValuePair<string, PerformanceRating>>());
-        GUIStats[subject].Add(new KeyValuePair<string, PerformanceRating>(output, rating));
+            GUIStats.Add(subject, new List<Issue>());
+        GUIStats[subject].Add(new Issue(output, show, fix, rating));
     }
 
-    VRCSDK2.VRC_SceneDescriptor[] scenes;
-    VRCSDK2.VRC_AvatarDescriptor[] avatars;
+    VRC.SDKBase.VRC_SceneDescriptor[] scenes;
+    VRC.SDKBase.VRC_AvatarDescriptor[] avatars;
     Vector2 scrollPos;
+    Vector2 builderScrollPos;
     Vector2 avatarListScrollPos;
-    VRCSDK2.VRC_AvatarDescriptor selectedAvatar;
+    VRC.SDKBase.VRC_AvatarDescriptor selectedAvatar;
 
-    public static void SelectAvatar( VRCSDK2.VRC_AvatarDescriptor  avatar )
+    public static void SelectAvatar(VRC.SDKBase.VRC_AvatarDescriptor avatar)
     {
         if (window != null)
             window.selectedAvatar = avatar;
@@ -142,14 +151,20 @@ public partial class VRCSdkControlPanel : EditorWindow
 
     private bool showAvatarPerformanceDetails
     {
-        get { return EditorPrefs.GetBool("VRCSDK2_showAvatarPerformanceDetails", false); }
-        set { EditorPrefs.SetBool("VRCSDK2_showAvatarPerformanceDetails", value); }
+        get { return EditorPrefs.GetBool("VRC.SDKBase_showAvatarPerformanceDetails", false); }
+        set { EditorPrefs.SetBool("VRC.SDKBase_showAvatarPerformanceDetails", value); }
+    }
+
+    private int triggerLineMode
+    {
+        get { return EditorPrefs.GetInt("VRC.SDKBase_triggerLineMode", 0); }
+        set { EditorPrefs.SetInt("VRC.SDKBase_triggerLineMode", value); }
     }
 
     public void FindScenesAndAvatars()
     {
-        var newScenes = (VRCSDK2.VRC_SceneDescriptor[])VRC.Tools.FindSceneObjectsOfTypeAll<VRCSDK2.VRC_SceneDescriptor>();
-        List<VRCSDK2.VRC_AvatarDescriptor> allavatars = VRC.Tools.FindSceneObjectsOfTypeAll<VRCSDK2.VRC_AvatarDescriptor>().ToList();
+        var newScenes = (VRC.SDKBase.VRC_SceneDescriptor[])VRC.Tools.FindSceneObjectsOfTypeAll<VRC.SDKBase.VRC_SceneDescriptor>();
+        List<VRC.SDKBase.VRC_AvatarDescriptor> allavatars = VRC.Tools.FindSceneObjectsOfTypeAll<VRC.SDKBase.VRC_AvatarDescriptor>().ToList();
         // select only the active avatars
         var newAvatars = allavatars.Where(av => (null != av) && av.gameObject.activeInHierarchy).ToArray();
 
@@ -169,29 +184,128 @@ public partial class VRCSdkControlPanel : EditorWindow
 
         scenes = newScenes;
         avatars = newAvatars;
+
+        if (VRCSdk3Analysis.GetSDKInScene(VRCSdk3Analysis.SdkVersion.VRCSDK3).Count > 0)
+            avatars = new VRC.SDKBase.VRC_AvatarDescriptor[0];
     }
 
     void ShowBuilder()
     {
+        GUILayout.BeginHorizontal();
+        GUILayout.FlexibleSpace();
+        GUILayout.BeginVertical();
+
         if (VRC.Core.RemoteConfig.IsInitialized())
         {
             string sdkUnityVersion = VRC.Core.RemoteConfig.GetString("sdkUnityVersion");
             if (Application.unityVersion != sdkUnityVersion)
             {
-                OnGUIWarning(null, "You are not using the recommended Unity version for the VRChat SDK. Content built with this version may not work correctly. Please use Unity " + sdkUnityVersion, null, null);
+                OnGUIWarning(null, "You are not using the recommended Unity version for the VRChat SDK. Content built with this version may not work correctly. Please use Unity " + sdkUnityVersion,
+                    null,
+                    () => { Application.OpenURL("https://unity3d.com/get-unity/download/archive"); }
+                    );
             }
         }
 
+        if (VRCSdk3Analysis.IsSdkDllActive(VRCSdk3Analysis.SdkVersion.VRCSDK2) && VRCSdk3Analysis.IsSdkDllActive(VRCSdk3Analysis.SdkVersion.VRCSDK3))
+        {
+            var sdk2Components = VRCSdk3Analysis.GetSDKInScene(VRCSdk3Analysis.SdkVersion.VRCSDK2);
+            var sdk3Components = VRCSdk3Analysis.GetSDKInScene(VRCSdk3Analysis.SdkVersion.VRCSDK3);
+            if (sdk2Components.Count > 0 && sdk3Components.Count > 0)
+            {
+                OnGUIError(null,
+                "This scene contains components from the VRChat SDK version 2 and version 3. Version two elements will have to be replaced with their version 3 counterparts to build with SDK3 and UDON.",
+                () => { Selection.objects = sdk2Components.ToArray(); },
+                null
+                );
+            }
+            //else if (sdk2Components.Count > 0)
+            //{
+            //    OnGUIError(null,
+            //    "This scene uses VRChat SDK 2 scripts. To continue using these scripts you may configure the SDK for VRCSDK2 usage on the settings tab. In order to use VRCSDK3 and Udon you must replace these VRCSDK2 components with the new VRCSDK3 components.",
+            //    () => { Selection.objects = sdk2Components.ToArray(); },
+            //    () => { VRCSettings.Get().activeWindowPanel = 3; }
+            //    );
+            //}
+            //else
+            //{
+            //    OnGUIError(null,
+            //    "You're almost ready to build content with VRChat SDK 3. You may go to the settings screen to configure your SDK or press Auto-Fix to set up SDK3 usage.",
+            //    () => { VRCSettings.Get().activeWindowPanel = 3; },
+            //    () => { VRCSdk3Analysis.SetSdkVersionActive(VRCSdk3Analysis.SdkVersion.VRCSDK3); }
+            //    );
+            //}
+        }
+
+        if (postProcessVolumeType != null)
+        {
+            if (Camera.main && Camera.main.GetComponentInChildren(postProcessVolumeType))
+            {
+                OnGUIWarning(null,
+                "Scene has a PostProcessVolume on the Reference Camera (Main Camera). This Camera is disabled at runtime. Please move the PostProcessVolume to another GameObject.",
+                () => { Selection.activeGameObject = Camera.main.gameObject; },
+                () => { TryMovePostProcessVolumeAwayFromMainCamera(); }
+                );
+            }
+        }
+
+        if (Lightmapping.giWorkflowMode == Lightmapping.GIWorkflowMode.Iterative)
+        {
+            OnGUIWarning(null,
+            "Automatic lightmap generation is enabled, which may stall the Unity build process. Before building and uploading, consider turning off 'Auto Generate' at the bottom of the Lighting Window.",
+            () =>
+            {
+                EditorWindow lightingWindow = GetLightingWindow();
+                if (lightingWindow)
+                {
+                    lightingWindow.Show();
+                    lightingWindow.Focus();
+                }
+            },
+            () =>
+            {
+                Lightmapping.giWorkflowMode = Lightmapping.GIWorkflowMode.OnDemand;
+                EditorWindow lightingWindow = GetLightingWindow();
+                if (lightingWindow)
+                {
+                    lightingWindow.Repaint();
+                    this.Focus();
+                }
+            }
+            );
+        }
+
+#if UDON
+        {
+            List<UdonBehaviour> failedBehaviours = ShouldShowPrimitivesWarning(); 
+            if (failedBehaviours.Count > 0)
+            {
+                OnGUIWarning(null,
+                    "Udon Objects reference builtin Unity mesh assets, this won't work. Consider making a copy of the mesh to use instead.",
+                    () => { Selection.objects = failedBehaviours.Select(s => s.gameObject).Cast<Object>().ToArray(); }, FixPrimitivesWarning);
+            }
+        }
+#endif
+
         FindScenesAndAvatars();
 
-        if ((null == scenes) || (null == avatars)) return;
+        if ((null == scenes) || (null == avatars))
+        {
+            if (Event.current.type != EventType.Used)
+            {
+                GUILayout.EndVertical();
+                GUILayout.FlexibleSpace();
+                GUILayout.EndHorizontal();
+            }
+            return;
+        }
 
         if (scenes.Length > 0 && avatars.Length > 0)
         {
             GameObject[] gos = new GameObject[avatars.Length];
             for (int i = 0; i < avatars.Length; ++i)
                 gos[i] = avatars[i].gameObject;
-            OnGUIError(null, "a unity scene containing a VRChat Scene Descriptor should not also contain avatars.",
+            OnGUIError(null, "A Unity scene containing a VRChat Scene Descriptor should not also contain avatars.",
                 delegate ()
                 {
                     List<GameObject> show = new List<GameObject>();
@@ -203,26 +317,29 @@ public partial class VRCSdkControlPanel : EditorWindow
                 }, null);
 
             EditorGUILayout.Separator();
-            EditorGUILayout.BeginVertical(GUILayout.Width(SdkWindowWidth));
+            GUILayout.BeginVertical(GUILayout.Width(SdkWindowWidth));
             OnGUIShowIssues();
-            EditorGUILayout.EndVertical();
+            GUILayout.EndVertical();
         }
         else if (scenes.Length > 1)
         {
             GameObject[] gos = new GameObject[scenes.Length];
             for (int i = 0; i < scenes.Length; ++i)
                 gos[i] = scenes[i].gameObject;
-            OnGUIError(null, "a unity scene containing a VRChat Scene Descriptor should only contain one scene descriptor.",
+            OnGUIError(null, "A Unity scene containing a VRChat Scene Descriptor should only contain one Scene Descriptor.",
                 delegate { Selection.objects = gos; }, null);
 
             EditorGUILayout.Separator();
-            EditorGUILayout.BeginVertical(GUILayout.Width(SdkWindowWidth));
+            GUILayout.BeginVertical(GUILayout.Width(SdkWindowWidth));
             OnGUIShowIssues();
-            EditorGUILayout.EndVertical();
+            GUILayout.EndVertical();
         }
         else if (scenes.Length == 1)
         {
-            bool inScroller = false;
+            bool inScroller = true;
+
+            scrollPos = GUILayout.BeginScrollView(scrollPos, false, false, GUIStyle.none, GUI.skin.verticalScrollbar, GUILayout.Width(SdkWindowWidth));
+
             try
             {
                 bool setupRequired = OnGUISceneSetup(scenes[0]);
@@ -238,13 +355,13 @@ public partial class VRCSdkControlPanel : EditorWindow
 
                     OnGUISceneSettings(scenes[0]);
 
-                    inScroller = true;
-                    scrollPos = EditorGUILayout.BeginScrollView(scrollPos, GUILayout.Width(SdkWindowWidth));
+                    OnGUIShowIssues();
                     OnGUIShowIssues(scenes[0]);
-                    EditorGUILayout.EndScrollView();
-                    inScroller = false;
 
                     GUILayout.FlexibleSpace();
+
+                    GUILayout.EndScrollView();
+                    inScroller = false;
 
                     OnGUIScene(scenes[0]);
 
@@ -252,15 +369,17 @@ public partial class VRCSdkControlPanel : EditorWindow
                 else
                 {
                     OnGuiFixIssuesToBuildOrTest();
+                    GUILayout.EndScrollView();
                 }
             }
             catch (System.Exception)
             {
                 if (inScroller)
-                    EditorGUILayout.EndScrollView();
+                    GUILayout.EndScrollView();
             }
+
         }
-        else if (avatars.Length > 0)
+        else if (avatars.Length > 0 && VRCSdk3Analysis.GetSDKInScene(VRCSdk3Analysis.SdkVersion.VRCSDK3).Count < 1)
         {
             if (!checkedForIssues)
             {
@@ -271,7 +390,7 @@ public partial class VRCSdkControlPanel : EditorWindow
             }
 
             bool drawList = true;
-            if( avatars.Length == 1 )
+            if (avatars.Length == 1)
             {
                 drawList = false;
                 selectedAvatar = avatars[0];
@@ -279,8 +398,8 @@ public partial class VRCSdkControlPanel : EditorWindow
 
             if (drawList)
             {
-                EditorGUILayout.BeginVertical(GUI.skin.GetStyle("HelpBox"), GUILayout.Width(SdkWindowWidth), GUILayout.MaxHeight(150));
-                avatarListScrollPos = EditorGUILayout.BeginScrollView(avatarListScrollPos, false, false);
+                GUILayout.BeginVertical(GUI.skin.GetStyle("HelpBox"), GUILayout.Width(SdkWindowWidth), GUILayout.MaxHeight(150));
+                avatarListScrollPos = GUILayout.BeginScrollView(avatarListScrollPos, false, false);
 
                 for (int i = 0; i < avatars.Length; ++i)
                 {
@@ -298,79 +417,103 @@ public partial class VRCSdkControlPanel : EditorWindow
                     }
                 }
 
-                EditorGUILayout.EndScrollView();
-                EditorGUILayout.EndVertical();
+                GUILayout.EndScrollView();
+                GUILayout.EndVertical();
             }
 
-            EditorGUILayout.BeginVertical(GUILayout.Width(SdkWindowWidth));
+            GUILayout.BeginVertical(GUILayout.Width(SdkWindowWidth));
             OnGUIShowIssues();
-            EditorGUILayout.EndVertical();
+            GUILayout.EndVertical();
 
             EditorGUILayout.Separator();
 
             if (selectedAvatar != null)
             {
-                EditorGUILayout.BeginVertical(boxGuiStyle);
+                GUILayout.BeginVertical(boxGuiStyle);
                 OnGUIAvatarSettings(selectedAvatar);
-                EditorGUILayout.EndVertical();
+                GUILayout.EndVertical();
 
-                scrollPos = EditorGUILayout.BeginScrollView(scrollPos, false, false, GUILayout.Width(SdkWindowWidth));
+                scrollPos = GUILayout.BeginScrollView(scrollPos, false, false, GUILayout.Width(SdkWindowWidth));
                 OnGUIShowIssues(selectedAvatar);
-                EditorGUILayout.EndScrollView();
+                GUILayout.EndScrollView();
 
                 GUILayout.FlexibleSpace();
 
-                EditorGUILayout.BeginVertical(boxGuiStyle);
+                GUILayout.BeginVertical(boxGuiStyle);
                 OnGUIAvatar(selectedAvatar);
-                EditorGUILayout.EndVertical();
+                GUILayout.EndVertical();
             }
         }
         else
         {
             EditorGUILayout.Space();
-            EditorGUILayout.LabelField("A VRC_SceneDescriptor or VRC_AvatarDescriptor is required to build VRChat SDK Content", titleGuiStyle);
+            if (BuildPipeline.isBuildingPlayer)
+            {
+                GUILayout.Space(20);
+                EditorGUILayout.LabelField("Building – Please Wait ...", titleGuiStyle, GUILayout.Width(SdkWindowWidth));
+            }
+            else
+            {
+                if (VRCSdk3Analysis.GetSDKInScene(VRCSdk3Analysis.SdkVersion.VRCSDK3).Count > 0)
+                {
+                    EditorGUILayout.LabelField("Avatars are currently not supported in SDK3", titleGuiStyle, GUILayout.Width(SdkWindowWidth));
+                }
+                else
+                {
+                    EditorGUILayout.LabelField("A VRC_SceneDescriptor or VRC_AvatarDescriptor\nis required to build VRChat SDK Content", titleGuiStyle, GUILayout.Width(SdkWindowWidth));
+                }
+            }
         }
+
+        if (Event.current.type != EventType.Used)
+        {
+            GUILayout.EndVertical();
+            GUILayout.FlexibleSpace();
+            GUILayout.EndHorizontal();
+        }
+
     }
 
     bool showLayerHelp = false;
     int numClients = 1;
+    bool forceNoVR = false;
 
-    void CheckUploadChanges(VRCSDK2.VRC_SceneDescriptor scene)
+    void CheckUploadChanges(VRC.SDKBase.VRC_SceneDescriptor scene)
     {
-        if (UnityEditor.EditorPrefs.HasKey("VRCSDK2_scene_changed") &&
-                UnityEditor.EditorPrefs.GetBool("VRCSDK2_scene_changed"))
+        if (UnityEditor.EditorPrefs.HasKey("VRC.SDKBase_scene_changed") &&
+                UnityEditor.EditorPrefs.GetBool("VRC.SDKBase_scene_changed"))
         {
-            UnityEditor.EditorPrefs.DeleteKey("VRCSDK2_scene_changed");
+            UnityEditor.EditorPrefs.DeleteKey("VRC.SDKBase_scene_changed");
 
-            if (UnityEditor.EditorPrefs.HasKey("VRCSDK2_capacity"))
+            if (UnityEditor.EditorPrefs.HasKey("VRC.SDKBase_capacity"))
             {
-                scene.capacity = UnityEditor.EditorPrefs.GetInt("VRCSDK2_capacity");
-                UnityEditor.EditorPrefs.DeleteKey("VRCSDK2_capacity");
+                scene.capacity = UnityEditor.EditorPrefs.GetInt("VRC.SDKBase_capacity");
+                UnityEditor.EditorPrefs.DeleteKey("VRC.SDKBase_capacity");
             }
-            if (UnityEditor.EditorPrefs.HasKey("VRCSDK2_content_sex"))
+            if (UnityEditor.EditorPrefs.HasKey("VRC.SDKBase_content_sex"))
             {
-                scene.contentSex = UnityEditor.EditorPrefs.GetBool("VRCSDK2_content_sex");
-                UnityEditor.EditorPrefs.DeleteKey("VRCSDK2_content_sex");
+                scene.contentSex = UnityEditor.EditorPrefs.GetBool("VRC.SDKBase_content_sex");
+                UnityEditor.EditorPrefs.DeleteKey("VRC.SDKBase_content_sex");
             }
-            if (UnityEditor.EditorPrefs.HasKey("VRCSDK2_content_violence"))
+            if (UnityEditor.EditorPrefs.HasKey("VRC.SDKBase_content_violence"))
             {
-                scene.contentViolence = UnityEditor.EditorPrefs.GetBool("VRCSDK2_content_violence");
-                UnityEditor.EditorPrefs.DeleteKey("VRCSDK2_content_violence");
+                scene.contentViolence = UnityEditor.EditorPrefs.GetBool("VRC.SDKBase_content_violence");
+                UnityEditor.EditorPrefs.DeleteKey("VRC.SDKBase_content_violence");
             }
-            if (UnityEditor.EditorPrefs.HasKey("VRCSDK2_content_gore"))
+            if (UnityEditor.EditorPrefs.HasKey("VRC.SDKBase_content_gore"))
             {
-                scene.contentGore = UnityEditor.EditorPrefs.GetBool("VRCSDK2_content_gore");
-                UnityEditor.EditorPrefs.DeleteKey("VRCSDK2_content_gore");
+                scene.contentGore = UnityEditor.EditorPrefs.GetBool("VRC.SDKBase_content_gore");
+                UnityEditor.EditorPrefs.DeleteKey("VRC.SDKBase_content_gore");
             }
-            if (UnityEditor.EditorPrefs.HasKey("VRCSDK2_content_other"))
+            if (UnityEditor.EditorPrefs.HasKey("VRC.SDKBase_content_other"))
             {
-                scene.contentOther = UnityEditor.EditorPrefs.GetBool("VRCSDK2_content_other");
-                UnityEditor.EditorPrefs.DeleteKey("VRCSDK2_content_other");
+                scene.contentOther = UnityEditor.EditorPrefs.GetBool("VRC.SDKBase_content_other");
+                UnityEditor.EditorPrefs.DeleteKey("VRC.SDKBase_content_other");
             }
-            if (UnityEditor.EditorPrefs.HasKey("VRCSDK2_release_public"))
+            if (UnityEditor.EditorPrefs.HasKey("VRC.SDKBase_release_public"))
             {
-                scene.releasePublic = UnityEditor.EditorPrefs.GetBool("VRCSDK2_release_public");
-                UnityEditor.EditorPrefs.DeleteKey("VRCSDK2_release_public");
+                scene.releasePublic = UnityEditor.EditorPrefs.GetBool("VRC.SDKBase_release_public");
+                UnityEditor.EditorPrefs.DeleteKey("VRC.SDKBase_release_public");
             }
 
             EditorUtility.SetDirty(scene);
@@ -399,34 +542,179 @@ public partial class VRCSdkControlPanel : EditorWindow
             return lightmapStripping.enumValueIndex == 0;
         }
     }
+    
+#if UDON
+
+    private static Mesh[] _primitiveMeshes;
+
+    private static List<UdonBehaviour> ShouldShowPrimitivesWarning()
+    {
+        if (_primitiveMeshes == null)
+        {
+            PrimitiveType[] primitiveTypes = (PrimitiveType[]) Enum.GetValues(typeof(PrimitiveType));
+            _primitiveMeshes = new Mesh[primitiveTypes.Length];
+
+            for (int i = 0; i < primitiveTypes.Length; i++)
+            {
+                PrimitiveType primitiveType = primitiveTypes[i];
+                GameObject go = GameObject.CreatePrimitive(primitiveType);
+                _primitiveMeshes[i] = go.GetComponent<MeshFilter>().sharedMesh;
+                DestroyImmediate(go);
+            }
+        }
+        
+        UdonBehaviour[] allBehaviours = FindObjectsOfType<UdonBehaviour>();
+        List<UdonBehaviour> failedBehaviours = new List<UdonBehaviour>(allBehaviours.Length);
+        foreach (UdonBehaviour behaviour in allBehaviours)
+        {
+            IUdonVariableTable publicVariables = behaviour.publicVariables;
+            foreach (string symbol in publicVariables.VariableSymbols)
+            {
+                if (!publicVariables.TryGetVariableValue(symbol, out Mesh mesh))
+                {
+                    continue;
+                }
+                if (mesh == null)
+                {
+                    continue;
+                }
+
+                bool all = true;
+                foreach (Mesh primitiveMesh in _primitiveMeshes)
+                {
+                    if (mesh != primitiveMesh)
+                    {
+                        continue;
+                    }
+                    all = false;
+                    break;
+                }
+
+                if (all)
+                {
+                    continue;
+                }
+
+                failedBehaviours.Add(behaviour);
+            }
+        }
+
+        return failedBehaviours;
+    }
+
+    void FixPrimitivesWarning()
+    {
+        UdonBehaviour[] allObjects = FindObjectsOfType<UdonBehaviour>();
+        foreach (UdonBehaviour behaviour in allObjects)
+        { 
+            IUdonVariableTable publicVariables = behaviour.publicVariables;
+            foreach (string symbol in publicVariables.VariableSymbols)
+            {
+                if (!publicVariables.TryGetVariableValue(symbol, out Mesh mesh))
+                {
+                    continue;
+                }
+                if (mesh == null)
+                {
+                    continue;
+                }
+
+                bool all = true;
+                foreach (Mesh primitiveMesh in _primitiveMeshes)
+                {
+                    if (mesh != primitiveMesh)
+                    {
+                        continue;
+                    }
+                    all = false;
+                    break;
+                }
+
+                if (all)
+                {
+                    continue;
+                }
+                
+                Mesh clone = Instantiate(mesh);
+
+                Scene scene = behaviour.gameObject.scene;
+                string scenePath = Path.GetDirectoryName(scene.path) ?? "Assets";
+
+                string folderName = $"{scene.name}_MeshClones";
+                string folderPath = Path.Combine(scenePath, folderName);
+
+                if(!AssetDatabase.IsValidFolder(folderPath))
+                {
+                    AssetDatabase.CreateFolder(scenePath, folderName);
+                }
+
+                string assetPath = Path.Combine(folderPath, $"{clone.name}.asset");
+
+                Mesh existingClone = AssetDatabase.LoadAssetAtPath<Mesh>(assetPath);
+                if (existingClone == null)
+                {
+                    AssetDatabase.CreateAsset(clone, assetPath);
+                    AssetDatabase.Refresh();
+                }
+                else
+                {
+                    clone = existingClone;
+                }
+                
+                publicVariables.TrySetVariableValue(symbol, clone);
+                EditorSceneManager.MarkSceneDirty(behaviour.gameObject.scene);
+            }
+        }
+    }
+#endif
 
     void DrawIssueBox(MessageType msgType, Texture icon, string message, System.Action show, System.Action fix)
     {
-        GUIStyle style = GUI.skin.GetStyle("HelpBox");
+        bool haveButtons = ((show != null) || (fix != null));
 
-        EditorGUILayout.BeginHorizontal();
-        if (icon != null)
-            GUILayout.Box(new GUIContent(message, icon), style);
-        else
-            EditorGUILayout.HelpBox(message, msgType);
-        EditorGUILayout.BeginVertical();
-        GUI.enabled = show != null;
-        if (GUILayout.Button("Select"))
-            show();
-        GUI.enabled = fix != null;
-        if (GUILayout.Button("Auto Fix"))
+        GUIStyle style = new GUIStyle("HelpBox");
+        style.fixedWidth = (haveButtons ? (SdkWindowWidth - 90) : SdkWindowWidth);
+        float minHeight = 40;
+
+        try
         {
-            fix();
-            EditorApplication.MarkSceneDirty();
-            //EditorSceneManager.MarkSceneDirty();
+            EditorGUILayout.BeginHorizontal();
+            if (icon != null)
+            {
+                GUIContent c = new GUIContent(message, icon);
+                float height = style.CalcHeight(c, style.fixedWidth);
+                GUILayout.Box(c, style, GUILayout.MinHeight(Mathf.Max(minHeight, height)));
+            }
+            else
+            {
+                GUIContent c = new GUIContent(message);
+                float height = style.CalcHeight(c, style.fixedWidth);
+                Rect rt = GUILayoutUtility.GetRect(c, style, GUILayout.MinHeight(Mathf.Max(minHeight, height)));
+                EditorGUI.HelpBox(rt, message, msgType);    // note: EditorGUILayout resulted in uneven button layout in this case
+            }
 
-            checkedForIssues = false;
-            Repaint();
+            if (haveButtons)
+            {
+                EditorGUILayout.BeginVertical();
+                float buttonHeight = ((show == null || fix == null) ? minHeight : (minHeight * 0.5f));
+                if ((show != null) && GUILayout.Button("Select", GUILayout.Height(buttonHeight)))
+                    show();
+                if ((fix != null) && GUILayout.Button("Auto Fix", GUILayout.Height(buttonHeight)))
+                {
+                    fix();
+                    EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
+                    checkedForIssues = false;
+                    Repaint();
+                }
+                EditorGUILayout.EndVertical();
+            }
+
+            EditorGUILayout.EndHorizontal();
         }
-        GUI.enabled = true;
-        EditorGUILayout.EndVertical();
-        EditorGUILayout.EndHorizontal();
-        //EditorGUILayout.Space();
+        catch
+        {
+            // mutes 'ArgumentException: Getting control 0's position in a group with only 0 controls when doing repaint'
+        }
     }
 
     void OnGuiFixIssuesToBuildOrTest()
@@ -441,7 +729,7 @@ public partial class VRCSdkControlPanel : EditorWindow
         EditorGUILayout.LabelField(FIX_ISSUES_TO_BUILD_OR_TEST_WARNING_STRING, s, GUILayout.Width(textDimensions.x), GUILayout.Height(WARNING_ICON_SIZE));
         EditorGUILayout.EndHorizontal();
         GUILayout.FlexibleSpace();
-        EditorGUILayout.EndVertical();
+        GUILayout.EndVertical();
     }
 
     void OnGUIShowIssues(Object subject = null)
@@ -462,17 +750,17 @@ public partial class VRCSdkControlPanel : EditorWindow
 
         if (GUIStats.ContainsKey(subject))
         {
-            foreach (var kvp in GUIStats[subject].Where(k => k.Value == PerformanceRating.VeryPoor))
-                GUILayout.Box(new GUIContent(kvp.Key, GetPerformanceIconForRating(kvp.Value)), style);
+            foreach (var kvp in GUIStats[subject].Where(k => k.performanceRating == PerformanceRating.VeryPoor))
+                DrawIssueBox(MessageType.Warning, GetPerformanceIconForRating(kvp.performanceRating), kvp.issueText, kvp.showThisIssue, kvp.fixThisIssue);
 
-            foreach (var kvp in GUIStats[subject].Where(k => k.Value == PerformanceRating.Poor))
-                GUILayout.Box(new GUIContent(kvp.Key, GetPerformanceIconForRating(kvp.Value)), style);
+            foreach (var kvp in GUIStats[subject].Where(k => k.performanceRating == PerformanceRating.Poor))
+                DrawIssueBox(MessageType.Warning, GetPerformanceIconForRating(kvp.performanceRating), kvp.issueText, kvp.showThisIssue, kvp.fixThisIssue);
 
-            foreach (var kvp in GUIStats[subject].Where(k => k.Value == PerformanceRating.Medium))
-                GUILayout.Box(new GUIContent(kvp.Key, GetPerformanceIconForRating(kvp.Value)), style);
+            foreach (var kvp in GUIStats[subject].Where(k => k.performanceRating == PerformanceRating.Medium))
+                DrawIssueBox(MessageType.Warning, GetPerformanceIconForRating(kvp.performanceRating), kvp.issueText, kvp.showThisIssue, kvp.fixThisIssue);
 
-            foreach (var kvp in GUIStats[subject].Where(k => k.Value == PerformanceRating.Good || k.Value == PerformanceRating.Excellent))
-                GUILayout.Box(new GUIContent(kvp.Key, GetPerformanceIconForRating(kvp.Value)), style);
+            foreach (var kvp in GUIStats[subject].Where(k => k.performanceRating == PerformanceRating.Good || k.performanceRating == PerformanceRating.Excellent))
+                DrawIssueBox(MessageType.Warning, GetPerformanceIconForRating(kvp.performanceRating), kvp.issueText, kvp.showThisIssue, kvp.fixThisIssue);
         }
 
         if (GUIInfos.ContainsKey(subject))
@@ -544,36 +832,118 @@ public partial class VRCSdkControlPanel : EditorWindow
         return back;
     }
 
+    void TryMovePostProcessVolumeAwayFromMainCamera()
+    {
+        if (!Camera.main)
+            return;
+
+        if (postProcessVolumeType == null)
+            return;
+        var oldVolume = Camera.main.GetComponentInChildren(postProcessVolumeType);
+        if (!oldVolume)
+            return;
+        GameObject oldObject = oldVolume.gameObject;
+        GameObject newObject = Instantiate(oldObject);
+        newObject.name = "Post Processing Volume";
+        newObject.tag = "Untagged";
+        foreach (Transform child in newObject.transform)
+        {
+            DestroyImmediate(child.gameObject);
+        }
+        var newVolume = newObject.GetComponentInChildren(postProcessVolumeType);
+        foreach (Component c in newObject.GetComponents<Component>())
+        {
+            if ((c == newObject.transform) || (c == newVolume))
+                continue;
+            DestroyImmediate(c);
+        }
+        DestroyImmediate(oldVolume);
+        this.Repaint();
+        Selection.activeGameObject = newObject;
+    }
+
     bool IsAudioSource2D(AudioSource src)
     {
         AnimationCurve curve = src.GetCustomCurve(AudioSourceCurveType.SpatialBlend);
         return src.spatialBlend == 0 && (curve == null || curve.keys.Length <= 1);
     }
 
-    void OnGUISceneCheck(VRCSDK2.VRC_SceneDescriptor scene)
+    void OnGUISceneCheck(VRC.SDKBase.VRC_SceneDescriptor scene)
     {
         CheckUploadChanges(scene);
 
+#if VRC_SDK_VRCSDK2
         if (VRC.Core.APIUser.CurrentUser != null && VRC.Core.APIUser.CurrentUser.hasScriptingAccess && !CustomDLLMaker.DoesScriptDirExist())
-        {
             CustomDLLMaker.CreateDirectories();
-        }
-
-        Vector3 g = Physics.gravity;
-        if (g.x != 0.0f || g.z != 0.0f)
-            OnGUIWarning(scene, "Gravity vector is not straight down. Though we support different gravity, player orientation is always 'upwards' so things don't always behave as you intend.",
-                delegate { EditorApplication.ExecuteMenuItem("Edit/Project Settings/Physics"); /*SettingsService.OpenProjectSettings("Project/Physics");*/ }, null);
-        if (g.y > 0)
-            OnGUIWarning(scene, "Gravity vector is not straight down, inverted or zero gravity will make walking extremely difficult.",
-                delegate { EditorApplication.ExecuteMenuItem("Edit/Project Settings/Physics"); /*SettingsService.OpenProjectSettings("Project/Physics");*/}, null);
-        if (g.y == 0)
-            OnGUIWarning(scene, "Zero gravity will make walking extremely difficult, though we support different gravity, player orientation is always 'upwards' so this may not have the effect you're looking for.",
-                delegate { EditorApplication.ExecuteMenuItem("Edit/Project Settings/Physics"); /*SettingsService.OpenProjectSettings("Project/Physics");*/}, null);
 
         // warn those without scripting access if they choose to script locally
         if (VRC.Core.APIUser.CurrentUser != null && !VRC.Core.APIUser.CurrentUser.hasScriptingAccess && CustomDLLMaker.DoesScriptDirExist())
         {
             OnGUIWarning(scene, "Your account does not have permissions to upload custom scripts. You can test locally but need to contact VRChat to publish your world with scripts.", null, null);
+        }
+#endif
+#if !VRC_SDK_VRCSDK2 && !VRC_SDK_VRCSDK3
+        bool isSdk3Scene = false;
+#elif VRC_SDK_VRCSDK2 && !VRC_SDK_VRCSDK3
+        bool isSdk3Scene = false;
+#elif !VRC_SDK_VRCSDK2 && VRC_SDK_VRCSDK3
+        bool isSdk3Scene = true;
+#else
+        bool isSdk3Scene = scene as VRC.SDK3.Components.VRCSceneDescriptor != null;
+#endif
+
+        var sdkBaseEventHandlers = new List<VRC.SDKBase.VRC_EventHandler>( GameObject.FindObjectsOfType<VRC.SDKBase.VRC_EventHandler>() );
+#if VRC_SDK_VRCSDK2
+        if (isSdk3Scene == false)
+        {
+            for (int i = sdkBaseEventHandlers.Count - 1; i >= 0; --i)
+                if (sdkBaseEventHandlers[i] as VRCSDK2.VRC_EventHandler)
+                    sdkBaseEventHandlers.RemoveAt(i);
+        }
+#endif
+        if (sdkBaseEventHandlers.Count > 0)
+        {
+            OnGUIError(scene, "You have Event Handlers in your scene that are not allowed in this build configuration.",
+                delegate
+                {
+                    var gos = sdkBaseEventHandlers.ConvertAll<GameObject>(item => (GameObject)item.gameObject);
+                    Selection.objects = gos.ToArray();
+                },
+                delegate
+                {
+                    foreach (var eh in sdkBaseEventHandlers)
+                    {
+                        var go = eh.gameObject;
+                        DestroyImmediate(eh);
+#if VRC_SDK_VRCSDK2
+                        if (isSdk3Scene == false)
+                        {
+                            if (VRCSDK2.VRC_SceneDescriptor.Instance as VRCSDK2.VRC_SceneDescriptor != null)
+                                go.AddComponent<VRCSDK2.VRC_EventHandler>();
+                        }
+#endif
+                    }
+                });
+        }
+
+        Vector3 g = Physics.gravity;
+        if (g.x != 0.0f || g.z != 0.0f)
+            OnGUIWarning(scene, "Gravity vector is not straight down. Though we support different gravity, player orientation is always 'upwards' so things don't always behave as you intend.",
+                delegate { SettingsService.OpenProjectSettings("Project/Physics"); }, null);
+        if (g.y > 0)
+            OnGUIWarning(scene, "Gravity vector is not straight down, inverted or zero gravity will make walking extremely difficult.",
+                delegate { SettingsService.OpenProjectSettings("Project/Physics"); }, null);
+        if (g.y == 0)
+            OnGUIWarning(scene, "Zero gravity will make walking extremely difficult, though we support different gravity, player orientation is always 'upwards' so this may not have the effect you're looking for.",
+                delegate { SettingsService.OpenProjectSettings("Project/Physics"); }, null);
+
+        if(CheckFogSettings())
+        {
+            OnGUIWarning(
+                scene, 
+                "Fog shader stripping is set to Custom, this may lead to incorrect or unnecessary shader variants being included in the build. You should use Automatic unless you change the fog mode at runtime.", 
+                delegate { SettingsService.OpenProjectSettings("Project/Graphics");},
+                delegate () { EnvConfig.SetFogSettings(new EnvConfig.FogSettings(EnvConfig.FogSettings.FogStrippingMode.Automatic));});
         }
 
         if (scene.autoSpatializeAudioSources)
@@ -585,49 +955,53 @@ public partial class VRCSdkControlPanel : EditorWindow
         }
 
         var audioSources = GameObject.FindObjectsOfType<AudioSource>();
-        foreach( var a in audioSources )
+        foreach (var a in audioSources)
         {
-            if( a.GetComponent<ONSPAudioSource>() != null )
+            if (a.GetComponent<ONSPAudioSource>() != null)
             {
                 OnGUIWarning(scene, "Found audio source(s) using ONSP, this is deprecated. Press 'fix' to convert to VRC_SpatialAudioSource.",
-                        delegate { Selection.activeObject = a.gameObject; }, 
+                        delegate { Selection.activeObject = a.gameObject; },
                         delegate { Selection.activeObject = a.gameObject; AutoAddSpatialAudioComponents.ConvertONSPAudioSource(a); }
                         );
                 break;
             }
-            else if( a.GetComponent<VRCSDK2.VRC_SpatialAudioSource>() == null )
+            else if (a.GetComponent<VRC.SDKBase.VRC_SpatialAudioSource>() == null)
             {
                 string msg = "Found 3D audio source with no VRC Spatial Audio component, this is deprecated. Press 'fix' to add a VRC_SpatialAudioSource.";
                 if (IsAudioSource2D(a))
                     msg = "Found 2D audio source with no VRC Spatial Audio component, this is deprecated. Press 'fix' to add a (disabled) VRC_SpatialAudioSource.";
 
                 OnGUIWarning(scene, msg,
-                        delegate { Selection.activeObject = a.gameObject; }, 
+                        delegate { Selection.activeObject = a.gameObject; },
                         delegate { Selection.activeObject = a.gameObject; AutoAddSpatialAudioComponents.AddVRCSpatialToBareAudioSource(a); }
                         );
                 break;
             }
         }
 
-        foreach (VRCSDK2.VRC_DataStorage ds in GameObject.FindObjectsOfType<VRCSDK2.VRC_DataStorage>())
+        if (HasSubstances())
+        {
+            OnGUIWarning(scene, "One or more scene objects have Substance materials. This is not supported and may break ingame. Please bake your Substances to regular materials.",
+                    () => { Selection.objects = GetSubstanceObjects(); },
+                    null);
+        }
+
+#if VRC_SDK_VRCSDK2
+        foreach (VRC.SDKBase.VRC_DataStorage ds in GameObject.FindObjectsOfType<VRC.SDKBase.VRC_DataStorage>())
         {
             VRCSDK2.VRC_ObjectSync os = ds.GetComponent<VRCSDK2.VRC_ObjectSync>();
             if (os != null && os.SynchronizePhysics)
                 OnGUIWarning(scene, ds.name + " has a VRC_DataStorage and VRC_ObjectSync, with SynchronizePhysics enabled.",
                     delegate { Selection.activeObject = os.gameObject; }, null);
         }
+#endif
 
         string vrcFilePath = WWW.UnEscapeURL(UnityEditor.EditorPrefs.GetString("lastVRCPath"));
         int fileSize = 0;
-        if (!string.IsNullOrEmpty(vrcFilePath) && ValidationHelpers.CheckIfAssetBundleFileTooLarge(ContentType.World, vrcFilePath, out fileSize))
+        if (!string.IsNullOrEmpty(vrcFilePath) && VRC.ValidationHelpers.CheckIfAssetBundleFileTooLarge(VRC.ContentType.World, vrcFilePath, out fileSize))
         {
-            OnGUIWarning(scene, ValidationHelpers.GetAssetBundleOverSizeLimitMessageSDKWarning(ContentType.World, fileSize), null, null);
+            OnGUIWarning(scene, VRC.ValidationHelpers.GetAssetBundleOverSizeLimitMessageSDKWarning(VRC.ContentType.World, fileSize), null, null);
         }
-
-        if (scene.UpdateTimeInMS < (int)(1000f / 90f * 3f))
-            OnGUIWarning(scene, "Room has a very fast update rate; experience may suffer with many users.",
-                delegate { Selection.activeObject = scene.gameObject; },
-                delegate { scene.UpdateTimeInMS = 100; Selection.activeObject = scene.gameObject; });
 
         foreach (GameObject go in FindObjectsOfType<GameObject>())
         {
@@ -653,47 +1027,125 @@ public partial class VRCSdkControlPanel : EditorWindow
                     Transform t = go.transform.parent.GetChild(idx);
                     if (t == go.transform)
                         continue;
-                    else if (t.name == go.transform.name
-                            && !(t.GetComponent<VRCSDK2.VRC_ObjectSync>()
-                                || t.GetComponent<VRCSDK2.VRC_SyncAnimation>()
-                                || t.GetComponent<VRCSDK2.VRC_SyncVideoPlayer>()
-                                || t.GetComponent<VRCSDK2.VRC_SyncVideoStream>()))
+                    else
                     {
-                        string path = t.name;
-                        Transform p = t.parent;
-                        while (p != null)
-                        {
-                            path = p.name + "/" + path;
-                            p = p.parent;
-                        }
+                        #if VRC_SDK_VRCSDK2
+                            bool allowedType = (t.GetComponent<VRCSDK2.VRC_ObjectSync>()
+                                || t.GetComponent<VRCSDK2.VRC_SyncAnimation>()
+                                || t.GetComponent<VRC.SDKBase.VRC_SyncVideoPlayer>()
+                                || t.GetComponent<VRC.SDKBase.VRC_SyncVideoStream>());
+                        #else
+                            bool allowedType = false;
+                        #endif
 
-                        OnGUIWarning(scene, "Sibling objects share the same path, which may break network events: " + path,
-                            delegate
+
+                        if (t.name == go.transform.name && !allowedType)
+                        {
+                            string path = t.name;
+                            Transform p = t.parent;
+                            while (p != null)
                             {
-                                List<GameObject> gos = new List<GameObject>();
-                                for (int c = 0; c < go.transform.parent.childCount; ++c)
-                                    if (go.transform.parent.GetChild(c).name == go.name)
-                                        gos.Add(go.transform.parent.GetChild(c).gameObject);
-                                Selection.objects = gos.ToArray();
-                            },
-                            delegate
-                            {
-                                List<GameObject> gos = new List<GameObject>();
-                                for (int c = 0; c < go.transform.parent.childCount; ++c)
-                                    if (go.transform.parent.GetChild(c).name == go.name)
-                                        gos.Add(go.transform.parent.GetChild(c).gameObject);
-                                Selection.objects = gos.ToArray();
-                                for (int i = 0; i < gos.Count; ++i)
-                                    gos[i].name = gos[i].name + "-" + i.ToString("00");
-                            });
-                        break;
+                                path = p.name + "/" + path;
+                                p = p.parent;
+                            }
+
+                            OnGUIWarning(scene, "Sibling objects share the same path, which may break network events: " + path,
+                                delegate
+                                {
+                                    List<GameObject> gos = new List<GameObject>();
+                                    for (int c = 0; c < go.transform.parent.childCount; ++c)
+                                        if (go.transform.parent.GetChild(c).name == go.name)
+                                            gos.Add(go.transform.parent.GetChild(c).gameObject);
+                                    Selection.objects = gos.ToArray();
+                                },
+                                delegate
+                                {
+                                    List<GameObject> gos = new List<GameObject>();
+                                    for (int c = 0; c < go.transform.parent.childCount; ++c)
+                                        if (go.transform.parent.GetChild(c).name == go.name)
+                                            gos.Add(go.transform.parent.GetChild(c).gameObject);
+                                    Selection.objects = gos.ToArray();
+                                    for (int i = 0; i < gos.Count; ++i)
+                                        gos[i].name = gos[i].name + "-" + i.ToString("00");
+                                });
+                            break;
+                        }
                     }
                 }
             }
         }
+
+        // detect dynamic materials and prefabs with identical names (since these could break triggers)
+        VRC.SDKBase.VRC_Trigger[] triggers = VRC.Tools.FindSceneObjectsOfTypeAll<VRC.SDKBase.VRC_Trigger>();
+        List<GameObject> prefabs = new List<GameObject>();
+        List<Material> materials = new List<Material>();
+
+#if VRC_SDK_VRCSDK2
+        VRC.AssetExporter.FindDynamicContent(ref prefabs, ref materials);
+#elif VRC_SDK_VRCSDK3
+            VRC.SDK3.Editor.AssetExporter.FindDynamicContent(ref prefabs, ref materials);
+#endif
+
+        foreach (VRC.SDKBase.VRC_Trigger t in triggers)
+        {
+            foreach (VRC.SDKBase.VRC_Trigger.TriggerEvent triggerEvent in t.Triggers)
+            {
+                foreach (VRC.SDKBase.VRC_EventHandler.VrcEvent e in triggerEvent.Events.Where(evt => evt.EventType == VRC.SDKBase.VRC_EventHandler.VrcEventType.SpawnObject))
+                {
+                    GameObject go = AssetDatabase.LoadAssetAtPath(e.ParameterString, typeof(GameObject)) as GameObject;
+                    if (go != null)
+                    {
+                        foreach (GameObject existing in prefabs)
+                        {
+                            if ((go != existing) && (go.name == existing.name))
+                            {
+                                OnGUIWarning(scene, "Trigger prefab '" + AssetDatabase.GetAssetPath(go).Replace(".prefab", "") + "' has same name as a prefab in another folder. This may break the trigger.",
+                                delegate
+                                {
+                                    Selection.objects = new GameObject[1] { go };
+                                },
+                                delegate
+                                {
+                                    AssetDatabase.RenameAsset(AssetDatabase.GetAssetPath(go), (go.name + "-" + go.GetInstanceID()));
+                                    AssetDatabase.Refresh();
+                                    e.ParameterString = AssetDatabase.GetAssetPath(go);
+                                });
+                            }
+                        }
+                    }
+                }
+
+                foreach (VRC.SDKBase.VRC_EventHandler.VrcEvent e in triggerEvent.Events.Where(evt => evt.EventType == VRC.SDKBase.VRC_EventHandler.VrcEventType.SetMaterial))
+                {
+                    Material mat = AssetDatabase.LoadAssetAtPath<Material>(e.ParameterString);
+                    if (mat != null && !mat.name.Contains("(Instance)"))
+                    {
+                        foreach (Material existing in materials)
+                        {
+                            if ((mat != existing) && (mat.name == existing.name))
+                            {
+                                OnGUIWarning(scene, "Trigger material '" + AssetDatabase.GetAssetPath(mat).Replace(".mat", "") + "' has same name as a material in another folder. This may break the trigger.",
+                                delegate
+                                {
+                                    Selection.objects = new Material[1] { mat };
+                                },
+                                delegate
+                                {
+                                    AssetDatabase.RenameAsset(AssetDatabase.GetAssetPath(mat), (mat.name + "-" + mat.GetInstanceID()));
+                                    AssetDatabase.Refresh();
+                                    e.ParameterString = AssetDatabase.GetAssetPath(mat);
+                                });
+
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
     }
 
-    bool OnGUISceneSetup(VRCSDK2.VRC_SceneDescriptor scene)
+    bool OnGUISceneSetup(VRC.SDKBase.VRC_SceneDescriptor scene)
     {
         bool mandatoryExpand = !UpdateLayers.AreLayersSetup() || !UpdateLayers.IsCollisionLayerMatrixSetup();
         if (mandatoryExpand)
@@ -702,26 +1154,26 @@ public partial class VRCSdkControlPanel : EditorWindow
         if (!UpdateLayers.AreLayersSetup())
         {
             GUILayout.BeginVertical(boxGuiStyle, GUILayout.Height(100), GUILayout.Width(SdkWindowWidth));
-            EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.BeginVertical(GUILayout.Width(300));
+            GUILayout.BeginHorizontal();
+            GUILayout.BeginVertical(GUILayout.Width(300));
             EditorGUILayout.Space();
             GUILayout.Label("Layers", infoGuiStyle);
             GUILayout.Label("VRChat scenes must have the same Unity layer configuration as VRChat so we can all predict things like physics and collisions. Pressing this button will configure your project's layers to match VRChat.", infoGuiStyle, GUILayout.Width(300));
-            EditorGUILayout.EndVertical();
-            EditorGUILayout.BeginVertical(GUILayout.Width(150));
+            GUILayout.EndVertical();
+            GUILayout.BeginVertical(GUILayout.Width(150));
             GUILayout.Label("", GUILayout.Height(15));
             if (UpdateLayers.AreLayersSetup())
             {
                 GUILayout.Label("Step Complete!", infoGuiStyle);
             }
-            else if (GUILayout.Button("Setup Layers for VRChat"))
+            else if (GUILayout.Button("Setup Layers for VRChat", GUILayout.Width(172)))
             {
                 bool doIt = EditorUtility.DisplayDialog("Setup Layers for VRChat", "This adds all VRChat layers to your project and pushes any custom layers down the layer list. If you have custom layers assigned to gameObjects, you'll need to reassign them. Are you sure you want to continue?", "Do it!", "Don't do it");
                 if (doIt)
                     UpdateLayers.SetupEditorLayers();
             }
-            EditorGUILayout.EndVertical();
-            EditorGUILayout.EndHorizontal();
+            GUILayout.EndVertical();
+            GUILayout.EndHorizontal();
             GUILayout.EndVertical();
             GUILayout.Space(10);
         }
@@ -729,13 +1181,13 @@ public partial class VRCSdkControlPanel : EditorWindow
         if (!UpdateLayers.IsCollisionLayerMatrixSetup())
         {
             GUILayout.BeginVertical(boxGuiStyle, GUILayout.Height(100), GUILayout.Width(SdkWindowWidth));
-            EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.BeginVertical(GUILayout.Width(300));
+            GUILayout.BeginHorizontal();
+            GUILayout.BeginVertical(GUILayout.Width(300));
             EditorGUILayout.Space();
             GUILayout.Label("Collision Matrix", infoGuiStyle);
             GUILayout.Label("VRChat uses specific layers for collision. In order for testing and development to run smoothly it is necessary to configure your project's collision matrix to match that of VRChat.", infoGuiStyle, GUILayout.Width(300));
-            EditorGUILayout.EndVertical();
-            EditorGUILayout.BeginVertical(GUILayout.Width(150));
+            GUILayout.EndVertical();
+            GUILayout.BeginVertical(GUILayout.Width(150));
             GUILayout.Label("", GUILayout.Height(15));
             if (UpdateLayers.AreLayersSetup() == false)
             {
@@ -747,7 +1199,7 @@ public partial class VRCSdkControlPanel : EditorWindow
             }
             else
             {
-                if (GUILayout.Button("Set Collision Matrix"))
+                if (GUILayout.Button("Set Collision Matrix", GUILayout.Width(172)))
                 {
                     bool doIt = EditorUtility.DisplayDialog("Setup Collision Layer Matrix for VRChat", "This will setup the correct physics collisions in the PhysicsManager for VRChat layers. Are you sure you want to continue?", "Do it!", "Don't do it");
                     if (doIt)
@@ -756,39 +1208,108 @@ public partial class VRCSdkControlPanel : EditorWindow
                     }
                 }
             }
-            EditorGUILayout.EndVertical();
-            EditorGUILayout.EndHorizontal();
+            GUILayout.EndVertical();
+            GUILayout.EndHorizontal();
             GUILayout.EndVertical();
             GUILayout.Space(10);
         }
 
         return mandatoryExpand;
     }
+    
+    void DrawContentInfoForWorld(VRC.Core.ApiWorld w)
+    {
+        DrawContentInfo(w.name, w.version.ToString(), w.description, w.capacity.ToString(), w.releaseStatus, w.tags);
+    }
 
-    void OnGUIAvatarSettings(VRCSDK2.VRC_AvatarDescriptor avatar)
+    void DrawContentInfoForAvatar(VRC.Core.ApiAvatar a)
+    {
+        DrawContentInfo(a.name, a.version.ToString(), a.description, null, a.releaseStatus, a.tags);
+    }
+
+    void DrawContentInfo(string name, string version, string description, string capacity, string releaseStatus, List<string> tags)
+    {
+        EditorGUILayout.LabelField("Name: " + name);
+        EditorGUILayout.LabelField("Version: " + version.ToString());
+        EditorGUILayout.LabelField("Description: " + description);
+        if (capacity != null)
+            EditorGUILayout.LabelField("Capacity: " + capacity);
+        EditorGUILayout.LabelField("Release: " + releaseStatus);
+        if (tags != null)
+        {
+            string tagString = "";
+            for (int i = 0; i < tags.Count; i++)
+            {
+                if (i != 0) tagString += ", ";
+                tagString += tags[i];
+            }
+            EditorGUILayout.LabelField("Tags: " + tagString);
+
+        }
+    }
+    void DrawContentPlatformSupport(VRC.Core.ApiModel m)
+    {
+        if (m.supportedPlatforms == VRC.Core.ApiModel.SupportedPlatforms.StandaloneWindows || m.supportedPlatforms == VRC.Core.ApiModel.SupportedPlatforms.All)
+            EditorGUILayout.LabelField("Windows Support: YES");
+        else
+            EditorGUILayout.LabelField("Windows Support: NO");
+
+        if (m.supportedPlatforms == VRC.Core.ApiModel.SupportedPlatforms.Android || m.supportedPlatforms == VRC.Core.ApiModel.SupportedPlatforms.All)
+            EditorGUILayout.LabelField("Android Support: YES");
+        else
+            EditorGUILayout.LabelField("Android Support: NO");
+    }
+
+    void DrawBuildTargetSwitcher()
+    {
+        EditorGUILayout.LabelField("Active Build Target: " + EditorUserBuildSettings.activeBuildTarget.ToString());
+        if (EditorUserBuildSettings.activeBuildTarget == BuildTarget.StandaloneWindows || EditorUserBuildSettings.activeBuildTarget == BuildTarget.StandaloneWindows64 && GUILayout.Button("Switch Build Target to Android"))
+        {
+            if (UnityEditor.EditorUtility.DisplayDialog("Build Target Switcher", "Are you sure you want to switch your build target to Android? This could take a while.", "Confirm", "Cancel"))
+                EditorUserBuildSettings.SwitchActiveBuildTargetAsync(BuildTargetGroup.Android, BuildTarget.Android);
+        }
+        if (EditorUserBuildSettings.activeBuildTarget == BuildTarget.Android && GUILayout.Button("Switch Build Target to Windows"))
+        {
+            if (UnityEditor.EditorUtility.DisplayDialog("Build Target Switcher", "Are you sure you want to switch your build target to Windows? This could take a while.", "Confirm", "Cancel"))
+                EditorUserBuildSettings.SwitchActiveBuildTargetAsync(BuildTargetGroup.Standalone, BuildTarget.StandaloneWindows64);
+        }
+    }
+
+    string GetBuildAndPublishButtonString()
+    {
+        string buildButtonString = "Build & Publish for UNSUPPORTED";
+        if (EditorUserBuildSettings.activeBuildTarget == BuildTarget.StandaloneWindows || EditorUserBuildSettings.activeBuildTarget == BuildTarget.StandaloneWindows64)
+            buildButtonString = "Build & Publish for Windows";
+        if (EditorUserBuildSettings.activeBuildTarget == BuildTarget.Android)
+            buildButtonString = "Build & Publish for Android";
+
+        return buildButtonString;
+    }
+
+    void OnGUIAvatarSettings(VRC.SDKBase.VRC_AvatarDescriptor avatar)
     {
         GUILayout.BeginVertical(boxGuiStyle, GUILayout.Width(SdkWindowWidth));
 
-        string name = avatar.gameObject.name;
+        string name = "Unpublished Avatar - " + avatar.gameObject.name;
         if (avatar.apiAvatar != null)
-            name = (avatar.apiAvatar as ApiAvatar).name;
+            name = (avatar.apiAvatar as VRC.Core.ApiAvatar).name;
         EditorGUILayout.Space();
         EditorGUILayout.LabelField(name, titleGuiStyle);
 
-        PipelineManager pm = avatar.GetComponent<PipelineManager>();
+        VRC.Core.PipelineManager pm = avatar.GetComponent<VRC.Core.PipelineManager>();
         if (pm != null && !string.IsNullOrEmpty(pm.blueprintId))
         {
             if (avatar.apiAvatar == null)
             {
-                ApiAvatar av = API.FromCacheOrNew<ApiAvatar>(pm.blueprintId);
+                VRC.Core.ApiAvatar av = VRC.Core.API.FromCacheOrNew<VRC.Core.ApiAvatar>(pm.blueprintId);
                 av.Fetch(
-                    (c) => avatar.apiAvatar = c.Model as ApiAvatar,
+                    (c) => avatar.apiAvatar = c.Model as VRC.Core.ApiAvatar,
                     (c) =>
                     {
                         if (c.Code == 404)
                         {
-                            Debug.LogErrorFormat("Could not load avatar {0} because it didn't exist.", pm.blueprintId);
-                            ApiCache.Invalidate<ApiWorld>(pm.blueprintId);
+                            VRC.Core.Logger.Log(string.Format("Could not load avatar {0} because it didn't exist.", pm.blueprintId), VRC.Core.DebugLevel.API);
+                            VRC.Core.ApiCache.Invalidate<VRC.Core.ApiWorld>(pm.blueprintId);
                         }
                         else
                             Debug.LogErrorFormat("Could not load avatar {0} because {1}", pm.blueprintId, c.Error);
@@ -799,68 +1320,42 @@ public partial class VRCSdkControlPanel : EditorWindow
 
         if (avatar.apiAvatar != null)
         {
-            ApiAvatar a = (avatar.apiAvatar as ApiAvatar);
-            EditorGUILayout.LabelField("Version: " + a.version.ToString());
-            EditorGUILayout.LabelField("Name: " + a.name);
-            GUILayout.Label(a.description, infoGuiStyle, GUILayout.Width(400));
-            EditorGUILayout.LabelField("Release: " + a.releaseStatus);
-            if (a.tags != null)
-                foreach (var t in a.tags)
-                    EditorGUILayout.LabelField("Tag: " + t);
-
-            if (a.supportedPlatforms == ApiModel.SupportedPlatforms.Android || a.supportedPlatforms == ApiModel.SupportedPlatforms.All)
-                EditorGUILayout.LabelField("Supports: Android");
-            if (a.supportedPlatforms == ApiModel.SupportedPlatforms.StandaloneWindows || a.supportedPlatforms == ApiModel.SupportedPlatforms.All)
-                EditorGUILayout.LabelField("Supports: Windows");
-
-            //w.imageUrl;
+            VRC.Core.ApiAvatar a = (avatar.apiAvatar as VRC.Core.ApiAvatar);
+            DrawContentInfoForAvatar(a);
+            DrawContentPlatformSupport(a);
         }
-        else
-        {
-            EditorGUILayout.LabelField("Version: " + "Unpublished");
-            EditorGUILayout.LabelField("Name: " + "");
-            GUILayout.Label("", infoGuiStyle, GUILayout.Width(400));
-            EditorGUILayout.LabelField("Release: " + "");
-            //foreach (var t in w.tags)
-            //    EditorGUILayout.LabelField("Tag: " + "");
-
-            //if (w.supportedPlatforms == ApiModel.SupportedPlatforms.Android || w.supportedPlatforms == ApiModel.SupportedPlatforms.All)
-            //    EditorGUILayout.LabelField("Supports: Android");
-            //if (w.supportedPlatforms == ApiModel.SupportedPlatforms.StandaloneWindows || w.supportedPlatforms == ApiModel.SupportedPlatforms.All)
-            //    EditorGUILayout.LabelField("Supports: Windows");
-
-            //w.imageUrl;
-        }
-
+        DrawBuildTargetSwitcher();
         GUILayout.EndVertical();
     }
 
-    void OnGUISceneSettings(VRCSDK2.VRC_SceneDescriptor scene)
+    void OnGUISceneSettings(VRC.SDKBase.VRC_SceneDescriptor scene)
     {
+        GUILayout.BeginHorizontal();
+        GUILayout.FlexibleSpace();
         GUILayout.BeginVertical(boxGuiStyle, GUILayout.Width(SdkWindowWidth));
 
         string name = "Unpublished VRChat World";
         if (scene.apiWorld != null)
-            name = (scene.apiWorld as ApiWorld).name;
+            name = (scene.apiWorld as VRC.Core.ApiWorld).name;
         EditorGUILayout.Space();
         EditorGUILayout.LabelField(name, titleGuiStyle);
 
-        PipelineManager[] pms = (PipelineManager[])VRC.Tools.FindSceneObjectsOfTypeAll<PipelineManager>();
+        VRC.Core.PipelineManager[] pms = VRC.Tools.FindSceneObjectsOfTypeAll<VRC.Core.PipelineManager>();
         if (pms.Length == 1)
         {
             if (!string.IsNullOrEmpty(pms[0].blueprintId))
             {
                 if (scene.apiWorld == null)
                 {
-                    ApiWorld world = API.FromCacheOrNew<ApiWorld>(pms[0].blueprintId);
+                    VRC.Core.ApiWorld world = VRC.Core.API.FromCacheOrNew<VRC.Core.ApiWorld>(pms[0].blueprintId);
                     world.Fetch(null, null,
-                        (c) => scene.apiWorld = c.Model as ApiWorld,
+                        (c) => scene.apiWorld = c.Model as VRC.Core.ApiWorld,
                         (c) =>
                         {
                             if (c.Code == 404)
                             {
-                                Debug.LogErrorFormat("Could not load world {0} because it didn't exist.", pms[0].blueprintId);
-                                ApiCache.Invalidate<ApiWorld>(pms[0].blueprintId);
+                                VRC.Core.Logger.Log(string.Format("Could not load world {0} because it didn't exist.", pms[0].blueprintId), VRC.Core.DebugLevel.All);
+                                VRC.Core.ApiCache.Invalidate<VRC.Core.ApiWorld>(pms[0].blueprintId);
                             }
                             else
                                 Debug.LogErrorFormat("Could not load world {0} because {1}", pms[0].blueprintId, c.Error);
@@ -876,42 +1371,17 @@ public partial class VRCSdkControlPanel : EditorWindow
 
         if (scene.apiWorld != null)
         {
-            ApiWorld w = (scene.apiWorld as ApiWorld);
-            EditorGUILayout.LabelField("Version: " + w.version.ToString());
-            EditorGUILayout.LabelField("Name: " + w.name);
-            GUILayout.Label(w.description, infoGuiStyle, GUILayout.Width(400));
-            EditorGUILayout.LabelField("Capacity: " + w.capacity);
-            EditorGUILayout.LabelField("Release: " + w.releaseStatus);
-            if (w.tags != null)
-                foreach (var t in w.tags)
-                    EditorGUILayout.LabelField("Tag: " + t);
-
-            if (w.supportedPlatforms == ApiModel.SupportedPlatforms.Android || w.supportedPlatforms == ApiModel.SupportedPlatforms.All)
-                EditorGUILayout.LabelField("Supports: Android");
-            if (w.supportedPlatforms == ApiModel.SupportedPlatforms.StandaloneWindows || w.supportedPlatforms == ApiModel.SupportedPlatforms.All)
-                EditorGUILayout.LabelField("Supports: Windows");
-
-            //w.imageUrl;
+            VRC.Core.ApiWorld w = (scene.apiWorld as VRC.Core.ApiWorld);
+            DrawContentInfoForWorld(w);
+            DrawContentPlatformSupport(w);
         }
-        else
-        {
-            EditorGUILayout.LabelField("Version: " + "Unpublished");
-            EditorGUILayout.LabelField("Name: " + "");
-            GUILayout.Label("", infoGuiStyle, GUILayout.Width(400));
-            EditorGUILayout.LabelField("Capacity: " + "");
-            EditorGUILayout.LabelField("Release: " + "");
-            //foreach (var t in w.tags)
-            //    EditorGUILayout.LabelField("Tag: " + "");
+        DrawBuildTargetSwitcher();
 
-            //if (w.supportedPlatforms == ApiModel.SupportedPlatforms.Android || w.supportedPlatforms == ApiModel.SupportedPlatforms.All)
-            //    EditorGUILayout.LabelField("Supports: Android");
-            //if (w.supportedPlatforms == ApiModel.SupportedPlatforms.StandaloneWindows || w.supportedPlatforms == ApiModel.SupportedPlatforms.All)
-            //    EditorGUILayout.LabelField("Supports: Windows");
-
-            //w.imageUrl;
-        }
-
-        if (APIUser.CurrentUser.hasScriptingAccess && VRCSettings.Get().DisplayAdvancedSettings)
+#if VRC_SDK_VRCSDK2
+        if (VRC.Core.APIUser.CurrentUser.hasScriptingAccess && VRCSettings.Get().DisplayAdvancedSettings)
+#elif VRC_SDK_VRCSDK3
+            if (VRC.Core.APIUser.CurrentUser.hasScriptingAccess && VRC.SDK3.Editor.VRCSettings.Get().DisplayAdvancedSettings)
+#endif
         {
             EditorGUILayout.Space();
             EditorGUILayout.BeginHorizontal();
@@ -924,38 +1394,63 @@ public partial class VRCSdkControlPanel : EditorWindow
         }
 
         GUILayout.EndVertical();
+        GUILayout.FlexibleSpace();
+        GUILayout.EndHorizontal();
     }
 
-    void OnGUIScene(VRCSDK2.VRC_SceneDescriptor scene)
+    void OnGUIScene(VRC.SDKBase.VRC_SceneDescriptor scene)
     {
-        EditorGUILayout.Space();
+        GUILayout.Label("", scrollViewSeparatorStyle);
+
+        builderScrollPos = GUILayout.BeginScrollView(builderScrollPos, false, false, GUIStyle.none, GUI.skin.verticalScrollbar, GUILayout.Width(SdkWindowWidth), GUILayout.MinHeight(217));
 
         GUILayout.BeginVertical(boxGuiStyle, GUILayout.Width(SdkWindowWidth));
         GUILayout.BeginHorizontal();
         GUILayout.BeginVertical(GUILayout.Width(300));
         EditorGUILayout.Space();
-        GUILayout.Label("Offline Testing", infoGuiStyle);
+        GUILayout.Label("Local Testing", infoGuiStyle);
         GUILayout.Label("Before uploading your world you may build and test it in the VRChat client. You won't be able to invite anyone from online but you can launch multiple of your own clients.", infoGuiStyle);
         GUILayout.EndVertical();
         GUILayout.BeginVertical(GUILayout.Width(200));
         EditorGUILayout.Space();
-        numClients = EditorGUILayout.IntField("Number of Clients", numClients);
+        numClients = EditorGUILayout.IntField("Number of Clients", numClients, GUILayout.MaxWidth(190));
+        EditorGUILayout.Space();
+        forceNoVR = EditorGUILayout.Toggle("Force Non-VR", forceNoVR, GUILayout.MaxWidth(190));
+        EditorGUILayout.Space();
 
         GUI.enabled = (GUIErrors.Count == 0 && checkedForIssues);
-        string lastUrl = VRC_SdkBuilder.GetLastUrl();
-        bool lastBuildPresent = lastUrl != null;
 
+        string lastUrl = "";
+#if VRC_SDK_VRCSDK2
+        lastUrl = VRC_SdkBuilder.GetLastUrl();
+#elif VRC_SDK_VRCSDK3
+            lastUrl = VRC.SDK3.Editor.VRC_SdkBuilder.GetLastUrl();
+#endif
+
+        bool lastBuildPresent = lastUrl != null;
         if (lastBuildPresent == false)
             GUI.enabled = false;
+#if VRC_SDK_VRCSDK2
         if (VRCSettings.Get().DisplayAdvancedSettings)
+#elif VRC_SDK_VRCSDK3
+        if (VRC.SDK3.Editor.VRCSettings.Get().DisplayAdvancedSettings)
+#endif
         {
             if (GUILayout.Button("Last Build"))
             {
+#if VRC_SDK_VRCSDK2
                 VRC_SdkBuilder.shouldBuildUnityPackage = false;
                 VRC_SdkBuilder.numClientsToLaunch = numClients;
+                VRC_SdkBuilder.forceNoVR = forceNoVR;
                 VRC_SdkBuilder.RunLastExportedSceneResource();
+#elif VRC_SDK_VRCSDK3
+                    VRC.SDK3.Editor.VRC_SdkBuilder.shouldBuildUnityPackage = false;
+                    VRC.SDK3.Editor.VRC_SdkBuilder.numClientsToLaunch = numClients;
+                    VRC.SDK3.Editor.VRC_SdkBuilder.forceNoVR = forceNoVR;
+                    VRC.SDK3.Editor.VRC_SdkBuilder.RunLastExportedSceneResource();
+#endif
             }
-            if (APIUser.CurrentUser.hasSuperPowers)
+            if (VRC.Core.APIUser.CurrentUser.hasSuperPowers)
             {
                 if (GUILayout.Button("Copy Test URL"))
                 {
@@ -966,21 +1461,43 @@ public partial class VRCSdkControlPanel : EditorWindow
                 }
             }
         }
-        GUI.enabled = (GUIErrors.Count == 0 && checkedForIssues) || APIUser.CurrentUser.developerType == APIUser.DeveloperType.Internal;
+        GUI.enabled = (GUIErrors.Count == 0 && checkedForIssues) || VRC.Core.APIUser.CurrentUser.developerType == VRC.Core.APIUser.DeveloperType.Internal;
+
+#if UNITY_ANDROID
+        EditorGUI.BeginDisabledGroup(true);
+#endif
         if (GUILayout.Button("Build & Test"))
         {
+#if VRC_SDK_VRCSDK2
             EnvConfig.ConfigurePlayerSettings();
             VRC_SdkBuilder.shouldBuildUnityPackage = false;
             VRC.AssetExporter.CleanupUnityPackageExport();  // force unity package rebuild on next publish
             VRC_SdkBuilder.numClientsToLaunch = numClients;
+            VRC_SdkBuilder.forceNoVR = forceNoVR;
             VRC_SdkBuilder.PreBuildBehaviourPackaging();
             VRC_SdkBuilder.ExportSceneResourceAndRun(customNamespace);
+#elif VRC_SDK_VRCSDK3
+                EnvConfig.ConfigurePlayerSettings();
+                VRC.SDK3.Editor.VRC_SdkBuilder.shouldBuildUnityPackage = false;
+                VRC.SDK3.Editor.AssetExporter.CleanupUnityPackageExport();  // force unity package rebuild on next publish
+                VRC.SDK3.Editor.VRC_SdkBuilder.numClientsToLaunch = numClients;
+                VRC.SDK3.Editor.VRC_SdkBuilder.forceNoVR = forceNoVR;
+                VRC.SDK3.Editor.VRC_SdkBuilder.PreBuildBehaviourPackaging();
+                VRC.SDK3.Editor.VRC_SdkBuilder.ExportSceneResourceAndRun(customNamespace);
+#endif
         }
-        GUILayout.EndVertical();
-        EditorGUILayout.EndHorizontal();
-        EditorGUILayout.Space();
+#if UNITY_ANDROID
+        EditorGUI.EndDisabledGroup();
+#endif
 
         GUILayout.EndVertical();
+
+        if (Event.current.type != EventType.Used)
+        {
+            GUILayout.EndHorizontal();
+            EditorGUILayout.Space();
+            GUILayout.EndVertical();
+        }
 
         EditorGUILayout.Space();
 
@@ -991,20 +1508,32 @@ public partial class VRCSdkControlPanel : EditorWindow
         EditorGUILayout.Space();
         GUILayout.Label("Online Publishing", infoGuiStyle);
         GUILayout.Label("In order for other people to enter your world in VRChat it must be built and published to our game servers.", infoGuiStyle);
+        EditorGUILayout.Space();
         GUILayout.EndVertical();
         GUILayout.BeginVertical(GUILayout.Width(200));
         EditorGUILayout.Space();
 
         if (lastBuildPresent == false)
             GUI.enabled = false;
+#if VRC_SDK_VRCSDK2
         if (VRCSettings.Get().DisplayAdvancedSettings)
+#elif VRC_SDK_VRCSDK3
+        if (VRC.SDK3.Editor.VRCSettings.Get().DisplayAdvancedSettings)
+#endif
         {
             if (GUILayout.Button("Last Build"))
             {
-                if (APIUser.CurrentUser.canPublishWorlds)
+                if (VRC.Core.APIUser.CurrentUser.canPublishWorlds)
                 {
+                    EditorPrefs.SetBool("VRC.SDKBase_StripAllShaders", false);
+
+#if VRC_SDK_VRCSDK2
                     VRC_SdkBuilder.shouldBuildUnityPackage = VRCSdkControlPanel.FutureProofPublishEnabled;
                     VRC_SdkBuilder.UploadLastExportedSceneBlueprint();
+#elif VRC_SDK_VRCSDK3
+                    VRC.SDK3.Editor.VRC_SdkBuilder.shouldBuildUnityPackage = VRCSdkControlPanel.FutureProofPublishEnabled;
+                    VRC.SDK3.Editor.VRC_SdkBuilder.UploadLastExportedSceneBlueprint();
+#endif
                 }
                 else
                 {
@@ -1012,32 +1541,45 @@ public partial class VRCSdkControlPanel : EditorWindow
                 }
             }
         }
-        GUI.enabled = (GUIErrors.Count == 0 && checkedForIssues) || APIUser.CurrentUser.developerType == APIUser.DeveloperType.Internal;
-        if (GUILayout.Button("Build & Publish"))
+        GUI.enabled = (GUIErrors.Count == 0 && checkedForIssues) || VRC.Core.APIUser.CurrentUser.developerType == VRC.Core.APIUser.DeveloperType.Internal;
+        if (GUILayout.Button(GetBuildAndPublishButtonString()))
         {
-            if (APIUser.CurrentUser.canPublishWorlds)
+            if (VRC.Core.APIUser.CurrentUser.canPublishWorlds)
             {
                 EnvConfig.ConfigurePlayerSettings();
+                EditorPrefs.SetBool("VRC.SDKBase_StripAllShaders", false);
+
+#if VRC_SDK_VRCSDK2
                 VRC_SdkBuilder.shouldBuildUnityPackage = VRCSdkControlPanel.FutureProofPublishEnabled;
                 VRC_SdkBuilder.PreBuildBehaviourPackaging();
                 VRC_SdkBuilder.ExportAndUploadSceneBlueprint(customNamespace);
+#elif VRC_SDK_VRCSDK3
+                    VRC.SDK3.Editor.VRC_SdkBuilder.shouldBuildUnityPackage = VRCSdkControlPanel.FutureProofPublishEnabled;
+                    VRC.SDK3.Editor.VRC_SdkBuilder.PreBuildBehaviourPackaging();
+                    VRC.SDK3.Editor.VRC_SdkBuilder.ExportAndUploadSceneBlueprint(customNamespace);
+#endif
             }
-            else 
+            else
             {
                 ShowContentPublishPermissionsDialog();
             }
         }
         GUILayout.EndVertical();
-        EditorGUILayout.EndHorizontal();
         GUI.enabled = true;
-        GUILayout.EndVertical();
+
+        if (Event.current.type != EventType.Used)
+        {
+            GUILayout.EndHorizontal();
+            GUILayout.EndVertical();
+            GUILayout.EndScrollView();
+        }
     }
 
     void OnGUISceneLayer(int layer, string name, string description)
     {
         if (LayerMask.LayerToName(layer) != name)
             OnGUIError(null, "Layer " + layer + " must be renamed to '" + name + "'",
-                delegate { EditorApplication.ExecuteMenuItem("Edit/Project Settings/Physics"); /*SettingsService.OpenProjectSettings("Project/Physics");*/ }, null);
+                delegate { SettingsService.OpenProjectSettings("Project/Physics"); }, null);
 
         if (showLayerHelp)
             OnGUIInformation(null, "Layer " + layer + " " + name + "\n" + description);
@@ -1069,7 +1611,7 @@ public partial class VRCSdkControlPanel : EditorWindow
         return list;
     }
 
-    bool AnalyzeIK(VRCSDK2.VRC_AvatarDescriptor ad, GameObject avObj, Animator anim)
+    bool AnalyzeIK(VRC.SDKBase.VRC_AvatarDescriptor ad, GameObject avObj, Animator anim)
     {
         bool hasHead = false;
         bool hasFeet = false;
@@ -1077,8 +1619,10 @@ public partial class VRCSdkControlPanel : EditorWindow
         bool hasThreeFingers = false;
         //bool hasToes = false;
         bool correctSpineHierarchy = false;
-        bool correctArmHierarchy = false;
-        bool correctLegHierarchy = false;
+        bool correctLeftArmHierarchy = false;
+        bool correctRightArmHierarchy = false;
+        bool correctLeftLegHierarchy = false;
+        bool correctRightLegHierarchy = false;
 
         bool status = true;
 
@@ -1124,9 +1668,17 @@ public partial class VRCSdkControlPanel : EditorWindow
         Transform lclav = anim.GetBoneTransform(HumanBodyBones.LeftShoulder);
         Transform rclav = anim.GetBoneTransform(HumanBodyBones.RightShoulder);
 
+
         if (null == neck || null == lclav || null == rclav || null == pelvis || null == torso || null == chest)
         {
-            OnGUIError(ad, "Spine hierarchy missing elements, make sure that Pelvis, Spine, Chest, Neck and Shoulders are mapped.", delegate () { Selection.activeObject = anim.gameObject; }, null);
+            string missingElements =
+            ((null == neck) ? "Neck, " : "") +
+            (((null == lclav) || (null == rclav)) ? "Shoulders, " : "") +
+            ((null == pelvis) ? "Pelvis, " : "") +
+            ((null == torso) ? "Spine, " : "") +
+            ((null == chest) ? "Chest, " : "");
+            missingElements = missingElements.Remove(missingElements.LastIndexOf(',')) + ".";
+            OnGUIError(ad, "Spine hierarchy missing elements, please map: " + missingElements, delegate () { Selection.activeObject = anim.gameObject; }, null);
             return false;
         }
 
@@ -1137,7 +1689,15 @@ public partial class VRCSdkControlPanel : EditorWindow
 
         if (!correctSpineHierarchy)
         {
-            OnGUIError(ad, "Spine hierarchy incorrect. Make sure that the parent of both Shoulders and the Neck is the Chest (or UpperChest if set).", delegate () { Selection.activeObject = anim.gameObject; }, null);
+            OnGUIError(ad, "Spine hierarchy incorrect. Make sure that the parent of both Shoulders and the Neck is the Chest (or UpperChest if set).", delegate ()
+            {
+                List<GameObject> gos = new List<GameObject>();
+                gos.Add(lclav.gameObject);
+                gos.Add(rclav.gameObject);
+                gos.Add(neck.gameObject);
+                gos.Add((null != upperchest) ? upperchest.gameObject : chest.gameObject);
+                Selection.objects = gos.ToArray();
+            }, null);
             return false;
         }
 
@@ -1146,12 +1706,23 @@ public partial class VRCSdkControlPanel : EditorWindow
         Transform rshoulder = anim.GetBoneTransform(HumanBodyBones.RightUpperArm);
         Transform relbow = anim.GetBoneTransform(HumanBodyBones.RightLowerArm);
 
-        correctArmHierarchy = lshoulder.GetChild(0) == lelbow && lelbow.GetChild(0) == lhand &&
-            rshoulder.GetChild(0) == relbow && relbow.GetChild(0) == rhand;
+        correctLeftArmHierarchy = (lshoulder && lelbow && (lshoulder.GetChild(0) == lelbow) && lhand && (lelbow.GetChild(0) == lhand));
+        correctRightArmHierarchy = (rshoulder && relbow && (rshoulder.GetChild(0) == relbow) && rhand && (relbow.GetChild(0) == rhand));
 
-        if (!correctArmHierarchy)
+        if (!(correctLeftArmHierarchy && correctRightArmHierarchy))
         {
-            OnGUIWarning(ad, "LowerArm is not first child of UpperArm or Hand is not first child of LowerArm: you may have problems with Forearm rotations.", delegate () { Selection.activeObject = anim.gameObject; }, null);
+            OnGUIWarning(ad, "LowerArm is not first child of UpperArm or Hand is not first child of LowerArm: you may have problems with Forearm rotations.", delegate ()
+            {
+                List<GameObject> gos = new List<GameObject>();
+                if (!correctLeftArmHierarchy && lshoulder)
+                    gos.Add(lshoulder.gameObject);
+                if (!correctRightArmHierarchy && rshoulder)
+                    gos.Add(rshoulder.gameObject);
+                if (gos.Count > 0)
+                    Selection.objects = gos.ToArray();
+                else
+                    Selection.activeObject = anim.gameObject;
+            }, null);
             status = false;
         }
 
@@ -1160,32 +1731,67 @@ public partial class VRCSdkControlPanel : EditorWindow
         Transform rhip = anim.GetBoneTransform(HumanBodyBones.RightUpperLeg);
         Transform rknee = anim.GetBoneTransform(HumanBodyBones.RightLowerLeg);
 
-        correctLegHierarchy = lhip.GetChild(0) == lknee && lknee.GetChild(0) == lfoot &&
-            rhip.GetChild(0) == rknee && rknee.GetChild(0) == rfoot;
+        correctLeftLegHierarchy = lhip && lknee && (lhip.GetChild(0) == lknee) && (lknee.GetChild(0) == lfoot);
+        correctRightLegHierarchy = rhip && rknee && (rhip.GetChild(0) == rknee) && (rknee.GetChild(0) == rfoot);
 
-        if (!correctLegHierarchy)
+        if (!(correctLeftLegHierarchy && correctRightLegHierarchy))
         {
-            OnGUIWarning(ad, "LowerLeg is not first child of UpperLeg or Foot is not first child of LowerLeg: you may have problems with Shin rotations.", delegate () { Selection.activeObject = anim.gameObject; }, null);
+            OnGUIWarning(ad, "LowerLeg is not first child of UpperLeg or Foot is not first child of LowerLeg: you may have problems with Shin rotations.", delegate ()
+            {
+                List<GameObject> gos = new List<GameObject>();
+                if (!correctLeftLegHierarchy && lhip)
+                    gos.Add(lhip.gameObject);
+                if (!correctRightLegHierarchy && rhip)
+                    gos.Add(rhip.gameObject);
+                if (gos.Count > 0)
+                    Selection.objects = gos.ToArray();
+                else
+                    Selection.activeObject = anim.gameObject;
+            }, null);
             status = false;
         }
 
-        if (!(IsAncestor(pelvis, rfoot) && IsAncestor(pelvis, lfoot) && IsAncestor(pelvis, lhand) || IsAncestor(pelvis, rhand) || IsAncestor(pelvis, lhand)))
+        if (!(IsAncestor(pelvis, rfoot) && IsAncestor(pelvis, lfoot) && IsAncestor(pelvis, lhand) && IsAncestor(pelvis, rhand)))
         {
-            OnGUIWarning(ad, "This avatar has a split heirarchy (Hips bone is not the ancestor of all humanoid bones). IK may not work correctly.", delegate () { Selection.activeObject = anim.gameObject; }, null);
+            OnGUIWarning(ad, "This avatar has a split hierarchy (Hips bone is not the ancestor of all humanoid bones). IK may not work correctly.", delegate ()
+            {
+                List<GameObject> gos = new List<GameObject>();
+                gos.Add(pelvis.gameObject);
+                if (!IsAncestor(pelvis, rfoot))
+                    gos.Add(rfoot.gameObject);
+                if (!IsAncestor(pelvis, lfoot))
+                    gos.Add(lfoot.gameObject);
+                if (!IsAncestor(pelvis, lhand))
+                    gos.Add(lhand.gameObject);
+                if (!IsAncestor(pelvis, rhand))
+                    gos.Add(rhand.gameObject);
+                Selection.objects = gos.ToArray();
+            }, null);
             status = false;
         }
 
         // if thigh bone rotations diverge from 180 from hip bone rotations, full-body tracking/ik does not work well
-        Vector3 hipLocalUp = pelvis.InverseTransformVector(Vector3.up);
-        Vector3 legLDir = lhip.TransformVector(hipLocalUp);
-        Vector3 legRDir = rhip.TransformVector(hipLocalUp);
-        float angL = Vector3.Angle(Vector3.up, legLDir);
-        float angR = Vector3.Angle(Vector3.up, legRDir);
-        if (angL < 175f || angR < 175f)
+        if (lhip && rhip)
         {
-            string angle = string.Format("{0:F1}", Mathf.Min(angL, angR));
-            OnGUIWarning(ad, "The angle between pelvis and thigh bones should be close to 180 degrees (this avatar's angle is " + angle + "). Your avatar may not work well with full-body IK and Tracking.", delegate () { Selection.activeObject = anim.gameObject; }, null);
-            status = false;
+            Vector3 hipLocalUp = pelvis.InverseTransformVector(Vector3.up);
+            Vector3 legLDir = lhip.TransformVector(hipLocalUp);
+            Vector3 legRDir = rhip.TransformVector(hipLocalUp);
+            float angL = Vector3.Angle(Vector3.up, legLDir);
+            float angR = Vector3.Angle(Vector3.up, legRDir);
+            if (angL < 175f || angR < 175f)
+            {
+                string angle = string.Format("{0:F1}", Mathf.Min(angL, angR));
+                OnGUIWarning(ad, "The angle between pelvis and thigh bones should be close to 180 degrees (this avatar's angle is " + angle + "). Your avatar may not work well with full-body IK and Tracking.", delegate ()
+                {
+                    List<GameObject> gos = new List<GameObject>();
+                    if (angL < 175f)
+                        gos.Add(rfoot.gameObject);
+                    if (angR < 175f)
+                        gos.Add(lfoot.gameObject);
+                    Selection.objects = gos.ToArray();
+                }, null);
+                status = false;
+            }
         }
         return status;
     }
@@ -1200,43 +1806,43 @@ public partial class VRCSdkControlPanel : EditorWindow
 
     void FixRestrictedComponents(IEnumerable<Component> componentsToRemove)
     {
-        List<GameObject> gos = new List<GameObject>();
-        foreach (var c in componentsToRemove)
+        List<Component> list = (componentsToRemove as List<Component>);
+        for (int v = (list.Count - 1); v > -1; v--)
         {
-            gos.Add(c.gameObject);
-            Destroy(c);
+            DestroyImmediate(list[v]);
         }
     }
 
-    void OnGUIAvatarCheck(VRCSDK2.VRC_AvatarDescriptor avatar)
+    void OnGUIAvatarCheck(VRC.SDKBase.VRC_AvatarDescriptor avatar)
     {
         string vrcFilePath = WWW.UnEscapeURL(UnityEditor.EditorPrefs.GetString("currentBuildingAssetBundlePath"));
         int fileSize = 0;
-        if (!string.IsNullOrEmpty(vrcFilePath) && ValidationHelpers.CheckIfAssetBundleFileTooLarge(ContentType.Avatar, vrcFilePath, out fileSize))
+        if (!string.IsNullOrEmpty(vrcFilePath) && VRC.ValidationHelpers.CheckIfAssetBundleFileTooLarge(VRC.ContentType.Avatar, vrcFilePath, out fileSize))
         {
-            OnGUIWarning(avatar, ValidationHelpers.GetAssetBundleOverSizeLimitMessageSDKWarning(ContentType.Avatar, fileSize), delegate () { Selection.activeObject = avatar.gameObject; }, null);
+            OnGUIWarning(avatar, VRC.ValidationHelpers.GetAssetBundleOverSizeLimitMessageSDKWarning(VRC.ContentType.Avatar, fileSize), delegate () { Selection.activeObject = avatar.gameObject; }, null);
         }
 
         AvatarPerformanceStats perfStats = new AvatarPerformanceStats();
         AvatarPerformance.CalculatePerformanceStats(avatar.Name, avatar.gameObject, perfStats);
 
-        OnGUIPerformanceInfo(avatar, perfStats, AvatarPerformanceCategory.Overall);
-        OnGUIPerformanceInfo(avatar, perfStats, AvatarPerformanceCategory.PolyCount);
-        OnGUIPerformanceInfo(avatar, perfStats, AvatarPerformanceCategory.AABB);
+        OnGUIPerformanceInfo(avatar, perfStats, AvatarPerformanceCategory.Overall, GetAvatarSubSelectAction(avatar, typeof(VRC.SDKBase.VRC_AvatarDescriptor)), null);
+        OnGUIPerformanceInfo(avatar, perfStats, AvatarPerformanceCategory.PolyCount, GetAvatarSubSelectAction(avatar, new System.Type[] { typeof(MeshRenderer), typeof(SkinnedMeshRenderer) }), null);
+        OnGUIPerformanceInfo(avatar, perfStats, AvatarPerformanceCategory.AABB, GetAvatarSubSelectAction(avatar, typeof(VRC.SDKBase.VRC_AvatarDescriptor)), null);
 
-        var eventHandler = avatar.GetComponentInChildren<VRCSDK2.VRC_EventHandler>();
-        if (eventHandler != null)
-        {
-            OnGUIError(avatar, "This avatar contains an EventHandler, which is not currently supported in VRChat.", delegate () { Selection.activeObject = avatar.gameObject; }, null);
-        }
-
-        if (avatar.lipSync == VRCSDK2.VRC_AvatarDescriptor.LipSyncStyle.VisemeBlendShape && avatar.VisemeSkinnedMesh == null)
+        if (avatar.lipSync == VRC.SDKBase.VRC_AvatarDescriptor.LipSyncStyle.VisemeBlendShape && avatar.VisemeSkinnedMesh == null)
             OnGUIError(avatar, "This avatar uses Visemes but the Face Mesh is not specified.", delegate () { Selection.activeObject = avatar.gameObject; }, null);
+
+        if (ShaderKeywordsUtility.DetectCustomShaderKeywords(avatar))
+            OnGUIWarning(avatar, "A Material on this avatar has custom shader keywords. Please consider optimizing it using the Shader Keywords Utility.",
+                () => { Selection.activeObject = avatar.gameObject; },
+                () => { EditorApplication.ExecuteMenuItem("VRChat SDK/Utilities/Avatar Shader Keywords Utility"); });
+
+        VerifyAvatarMipMapStreaming(avatar);
 
         var anim = avatar.GetComponent<Animator>();
         if (anim == null)
         {
-            OnGUIWarning(avatar, "This avatar does not contain an animator, and will not animate in VRChat.", delegate () { Selection.activeObject = avatar.gameObject; }, null);
+            OnGUIWarning(avatar, "This avatar does not contain an Animator, and will not animate in VRChat.", delegate () { Selection.activeObject = avatar.gameObject; }, null);
         }
         else if (anim.isHuman == false)
         {
@@ -1248,19 +1854,30 @@ public partial class VRCSdkControlPanel : EditorWindow
         }
         else
         {
-            Transform foot = anim.GetBoneTransform(HumanBodyBones.LeftFoot);
-            Transform shoulder = anim.GetBoneTransform(HumanBodyBones.LeftUpperArm);
-            if (foot == null)
-                OnGUIError(avatar, "Your avatar is humanoid, but it's feet aren't specified!", delegate () { Selection.activeObject = avatar.gameObject; }, null);
-            if (shoulder == null)
-                OnGUIError(avatar, "Your avatar is humanoid, but it's upper arms aren't specified!", delegate () { Selection.activeObject = avatar.gameObject; }, null);
-
-            if (foot != null && shoulder != null)
+            Transform lfoot = anim.GetBoneTransform(HumanBodyBones.LeftFoot);
+            Transform rfoot = anim.GetBoneTransform(HumanBodyBones.RightFoot);
+            if ((lfoot == null) || (rfoot == null))
+                OnGUIError(avatar, "Your avatar is humanoid, but its feet aren't specified!", delegate () { Selection.activeObject = avatar.gameObject; }, null);
+            if (lfoot != null && rfoot != null)
             {
-                Vector3 footPos = foot.position - avatar.transform.position;
+                Vector3 footPos = lfoot.position - avatar.transform.position;
                 if (footPos.y < 0)
-                    OnGUIWarning(avatar, "Avatar feet are beneath the avatar's origin (the floor). That's probably not what you want.", delegate () { Selection.activeObject = avatar.gameObject; }, null);
-                Vector3 shoulderPosition = shoulder.position - avatar.transform.position;
+                    OnGUIWarning(avatar, "Avatar feet are beneath the avatar's origin (the floor). That's probably not what you want.", delegate ()
+                    {
+                        List<GameObject> gos = new List<GameObject>();
+                        gos.Add(rfoot.gameObject);
+                        gos.Add(lfoot.gameObject);
+                        Selection.objects = gos.ToArray();
+                    }, null);
+            }
+
+            Transform lshoulder = anim.GetBoneTransform(HumanBodyBones.LeftUpperArm);
+            Transform rshoulder = anim.GetBoneTransform(HumanBodyBones.RightUpperArm);
+            if ((lshoulder == null) || (rshoulder == null))
+                OnGUIError(avatar, "Your avatar is humanoid, but its upper arms aren't specified!", delegate () { Selection.activeObject = avatar.gameObject; }, null);
+            if (lshoulder != null && rshoulder != null)
+            {
+                Vector3 shoulderPosition = lshoulder.position - avatar.transform.position;
                 if (shoulderPosition.y < 0.2f)
                     OnGUIError(avatar, "This avatar is too short. The minimum is 20cm shoulder height.", delegate () { Selection.activeObject = avatar.gameObject; }, null);
                 else if (shoulderPosition.y < 1.0f)
@@ -1286,14 +1903,22 @@ public partial class VRCSdkControlPanel : EditorWindow
         if (componentsToRemoveNames.Count > 0)
             OnGUIError(avatar, "The following component types are found on the Avatar and will be removed by the client: " + string.Join(", ", componentsToRemoveNames.ToArray()), delegate () { ShowRestrictedComponents(componentsToRemove); }, delegate () { FixRestrictedComponents(componentsToRemove); });
 
-        if (AvatarValidation.EnforceAudioSourceLimits(avatar.gameObject).Count > 0)
-            OnGUIWarning(avatar, "Audio sources found on Avatar, they will be adjusted to safe limits, if necessary.", delegate () { Selection.activeObject = avatar.gameObject; }, null);
+        List<AudioSource> audioSources = avatar.gameObject.GetComponentsInChildren<AudioSource>(true).ToList<AudioSource>();
+        if (audioSources.Count > 0)
+            OnGUIWarning(avatar, "Audio sources found on Avatar, they will be adjusted to safe limits, if necessary.",
+                GetAvatarSubSelectAction(avatar, typeof(AudioSource)), null);
 
-        if (AvatarValidation.EnforceAvatarStationLimits(avatar.gameObject).Count > 0)
-            OnGUIWarning(avatar, "Stations found on Avatar, they will be adjusted to safe limits, if necessary.", delegate () { Selection.activeObject = avatar.gameObject; }, null);
+        List<VRC.SDKBase.VRCStation> stations = avatar.gameObject.GetComponentsInChildren<VRC.SDKBase.VRCStation>(true).ToList<VRC.SDKBase.VRCStation>();
+        if (stations.Count > 0)
+            OnGUIWarning(avatar, "Stations found on Avatar, they will be adjusted to safe limits, if necessary.",
+                GetAvatarSubSelectAction(avatar, typeof(VRC.SDKBase.VRCStation)), null);
 
-        if (avatar.gameObject.GetComponentInChildren<Camera>() != null)
-            OnGUIWarning(avatar, "Cameras are removed from non-local avatars at runtime.", delegate () { Selection.activeObject = avatar.gameObject; }, null);
+        if (HasSubstances(avatar.gameObject))
+        {
+            OnGUIWarning(avatar, "This avatar has one or more Substance materials, which is not supported and may break ingame. Please bake your Substances to regular materials.",
+                    () => { Selection.objects = GetSubstanceObjects(avatar.gameObject); },
+                    null);
+        }
 
 #if UNITY_ANDROID
         IEnumerable<Shader> illegalShaders = AvatarValidation.FindIllegalShaders(avatar.gameObject);
@@ -1313,59 +1938,222 @@ public partial class VRCSdkControlPanel : EditorWindow
                 continue;
             }
 
-            OnGUIPerformanceInfo(avatar, perfStats, perfCategory);
+            System.Action show = null;
+
+            switch (perfCategory)
+            {
+                case AvatarPerformanceCategory.AnimatorCount: show = GetAvatarSubSelectAction(avatar, typeof(Animator)); break;
+                case AvatarPerformanceCategory.AudioSourceCount: show = GetAvatarSubSelectAction(avatar, typeof(AudioSource)); break;
+                case AvatarPerformanceCategory.BoneCount: show = GetAvatarSubSelectAction(avatar, typeof(SkinnedMeshRenderer)); break;
+                case AvatarPerformanceCategory.ClothCount: show = GetAvatarSubSelectAction(avatar, typeof(Cloth)); break;
+                case AvatarPerformanceCategory.ClothMaxVertices: show = GetAvatarSubSelectAction(avatar, typeof(Cloth)); break;
+                case AvatarPerformanceCategory.LightCount: show = GetAvatarSubSelectAction(avatar, typeof(Light)); break;
+                case AvatarPerformanceCategory.LineRendererCount: show = GetAvatarSubSelectAction(avatar, typeof(LineRenderer)); break;
+                case AvatarPerformanceCategory.MaterialCount: show = GetAvatarSubSelectAction(avatar, new System.Type[] { typeof(MeshRenderer), typeof(SkinnedMeshRenderer) }); break;
+                case AvatarPerformanceCategory.MeshCount: show = GetAvatarSubSelectAction(avatar, new System.Type[] { typeof(MeshRenderer), typeof(SkinnedMeshRenderer) }); break;
+                case AvatarPerformanceCategory.ParticleCollisionEnabled: show = GetAvatarSubSelectAction(avatar, typeof(ParticleSystem)); break;
+                case AvatarPerformanceCategory.ParticleMaxMeshPolyCount: show = GetAvatarSubSelectAction(avatar, typeof(ParticleSystem)); break;
+                case AvatarPerformanceCategory.ParticleSystemCount: show = GetAvatarSubSelectAction(avatar, typeof(ParticleSystem)); break;
+                case AvatarPerformanceCategory.ParticleTotalCount: show = GetAvatarSubSelectAction(avatar, typeof(ParticleSystem)); break;
+                case AvatarPerformanceCategory.ParticleTrailsEnabled: show = GetAvatarSubSelectAction(avatar, typeof(ParticleSystem)); break;
+                case AvatarPerformanceCategory.PhysicsColliderCount: show = GetAvatarSubSelectAction(avatar, typeof(Collider)); break;
+                case AvatarPerformanceCategory.PhysicsRigidbodyCount: show = GetAvatarSubSelectAction(avatar, typeof(Rigidbody)); break;
+                case AvatarPerformanceCategory.PolyCount: show = GetAvatarSubSelectAction(avatar, new System.Type[] { typeof(MeshRenderer), typeof(SkinnedMeshRenderer) }); break;
+                case AvatarPerformanceCategory.SkinnedMeshCount: show = GetAvatarSubSelectAction(avatar, typeof(SkinnedMeshRenderer)); break;
+                case AvatarPerformanceCategory.TrailRendererCount: show = GetAvatarSubSelectAction(avatar, typeof(TrailRenderer)); break;
+            }
+
+            // we can only show these buttons if DynamicBone is installed
+
+            System.Type dynamicBoneType = typeof(VRCSDK2.Validation.AvatarValidation).Assembly.GetType("DynamicBone");
+            System.Type dynamicBoneColliderType = typeof(VRCSDK2.Validation.AvatarValidation).Assembly.GetType("DynamicBoneCollider");
+            if ((dynamicBoneType != null) && (dynamicBoneColliderType != null))
+            {
+                switch (perfCategory)
+                {
+                    case AvatarPerformanceCategory.DynamicBoneColliderCount: show = GetAvatarSubSelectAction(avatar, dynamicBoneColliderType); break;
+                    case AvatarPerformanceCategory.DynamicBoneCollisionCheckCount: show = GetAvatarSubSelectAction(avatar, dynamicBoneColliderType); break;
+                    case AvatarPerformanceCategory.DynamicBoneComponentCount: show = GetAvatarSubSelectAction(avatar, dynamicBoneType); break;
+                    case AvatarPerformanceCategory.DynamicBoneSimulatedBoneCount: show = GetAvatarSubSelectAction(avatar, dynamicBoneType); break;
+                }
+            }
+
+            OnGUIPerformanceInfo(avatar, perfStats, perfCategory, show, null);
         }
 
         OnGUILink(avatar, "Avatar Optimization Tips", kAvatarOptimizationTipsURL);
     }
 
-    void OnGUIPerformanceInfo(VRCSDK2.VRC_AvatarDescriptor avatar, AvatarPerformanceStats perfStats, AvatarPerformanceCategory perfCategory)
+    GameObject[] GetSubstanceObjects(GameObject obj = null, bool earlyOut = false)
+    {
+        // if 'obj' is null we check entire scene
+        // if 'earlyout' is true we only return 1st object (to detect if substances are present)
+
+        var objs = new List<GameObject>();
+        Renderer[] renderers;
+
+        renderers = (obj ? obj.GetComponentsInChildren<Renderer>(true) : FindObjectsOfType<Renderer>());
+
+        if ((renderers == null) || (renderers.Length < 1))
+            return null;
+        foreach (Renderer r in renderers)
+        {
+            if (r.sharedMaterials.Length < 1)
+                continue;
+            foreach (Material m in r.sharedMaterials)
+            {
+                if (!m)
+                    continue;
+                string path = AssetDatabase.GetAssetPath(m);
+                if (string.IsNullOrEmpty(path))
+                    continue;
+                if (path.EndsWith(".sbsar", true, System.Globalization.CultureInfo.InvariantCulture))
+                {
+                    objs.Add(r.gameObject);
+                    if (earlyOut)
+                        return objs.ToArray();
+                }
+            }
+        }
+        if (objs.Count < 1)
+            return null;
+
+        return objs.ToArray();
+    }
+
+    bool HasSubstances(GameObject obj = null)
+    {
+        return (GetSubstanceObjects(obj, true) != null);
+    }
+
+    void VerifyAvatarMipMapStreaming(VRC.SDKBase.VRC_AvatarDescriptor avatar)
+    {
+        List<TextureImporter> badTextures = new List<TextureImporter>();
+        foreach (Renderer r in avatar.GetComponentsInChildren<Renderer>(true))
+        {
+            foreach (Material m in r.sharedMaterials)
+            {
+                if (!m)
+                    continue;
+                int[] texIDs = m.GetTexturePropertyNameIDs();
+                if (texIDs == null)
+                    continue;
+                foreach (int i in texIDs)
+                {
+                    Texture t = m.GetTexture(i);
+                    if (!t)
+                        continue;
+                    string path = AssetDatabase.GetAssetPath(t);
+                    if (string.IsNullOrEmpty(path))
+                        continue;
+                    TextureImporter importer = (TextureImporter.GetAtPath(path) as TextureImporter);
+                    if (importer && importer.mipmapEnabled && !importer.streamingMipmaps)
+                        badTextures.Add(importer);
+                }
+            }
+        }
+
+        if (badTextures.Count == 0)
+            return;
+
+        OnGUIError(avatar, "This avatar has mipmapped textures without 'Streaming Mip Maps' enabled.",
+        () => { Selection.objects = badTextures.ToArray(); },
+        () =>
+        {
+            List<string> paths = new List<string>();
+            foreach (TextureImporter t in badTextures)
+            {
+                Undo.RecordObject(t, "Set Mip Map Streaming");
+                t.streamingMipmaps = true;
+                t.streamingMipmapsPriority = 0;
+                EditorUtility.SetDirty(t);
+                paths.Add(t.assetPath);
+            }
+            AssetDatabase.ForceReserializeAssets(paths, ForceReserializeAssetsOptions.ReserializeAssetsAndMetadata);
+            AssetDatabase.Refresh();
+        });
+
+    }
+
+    System.Action GetAvatarSubSelectAction(VRC.SDKBase.VRC_AvatarDescriptor avatar, System.Type[] types)
+    {
+        return () =>
+        {
+            var gos = new List<GameObject>();
+            foreach (System.Type t in types)
+            {
+                Component[] components = avatar.GetComponentsInChildren(t, true);
+                foreach (Component c in components)
+                    gos.Add(c.gameObject);
+            }
+            if ((gos != null) && (gos.Count > 0))
+                Selection.objects = gos.ToArray();
+            else
+                Selection.objects = new Object[] { avatar.gameObject };
+        };
+    }
+
+    System.Action GetAvatarSubSelectAction(VRC.SDKBase.VRC_AvatarDescriptor avatar, System.Type type)
+    {
+        var t = new List<System.Type>();
+        t.Add(type);
+        return GetAvatarSubSelectAction(avatar, t.ToArray());
+    }
+
+    EditorWindow GetLightingWindow()
+    {
+        var editorAsm = typeof(UnityEditor.Editor).Assembly;
+        return EditorWindow.GetWindow(editorAsm.GetType("UnityEditor.LightingWindow"));
+    }
+
+    void OnGUIPerformanceInfo(VRC.SDKBase.VRC_AvatarDescriptor avatar, AvatarPerformanceStats perfStats, AvatarPerformanceCategory perfCategory, System.Action show, System.Action fix)
     {
         string text;
         PerformanceInfoDisplayLevel displayLevel;
         PerformanceRating rating = perfStats.GetPerformanceRatingForCategory(perfCategory);
         SDKPerformanceDisplay.GetSDKPerformanceInfoText(perfStats, perfCategory, out text, out displayLevel);
 
-        switch(displayLevel)
+        switch (displayLevel)
         {
             case PerformanceInfoDisplayLevel.None:
-            {
-                break;
-            }
-            case PerformanceInfoDisplayLevel.Verbose:
-            {
-                if(showAvatarPerformanceDetails)
                 {
-                    OnGUIStat(avatar, text, rating);
+                    break;
                 }
-                break;
-            }
+            case PerformanceInfoDisplayLevel.Verbose:
+                {
+                    if (showAvatarPerformanceDetails)
+                    {
+                        OnGUIStat(avatar, text, rating, show, fix);
+                    }
+                    break;
+                }
             case PerformanceInfoDisplayLevel.Info:
-            {
-                OnGUIStat(avatar, text, rating);
-                break;
-            }
+                {
+                    OnGUIStat(avatar, text, rating, show, fix);
+                    break;
+                }
             case PerformanceInfoDisplayLevel.Warning:
-            {
-                OnGUIStat(avatar, text, rating);
-                break;
-            }
+                {
+                    OnGUIStat(avatar, text, rating, show, fix);
+                    break;
+                }
             case PerformanceInfoDisplayLevel.Error:
-            {
-                OnGUIStat(avatar, text, rating);
-                OnGUIError(avatar, text, delegate () { Selection.activeObject = avatar.gameObject; }, null);
-                break;
-            }
+                {
+                    OnGUIStat(avatar, text, rating, show, fix);
+                    OnGUIError(avatar, text, delegate () { Selection.activeObject = avatar.gameObject; }, null);
+                    break;
+                }
             default:
-            {
-                OnGUIError(avatar, "Unknown performance display level.", delegate () { Selection.activeObject = avatar.gameObject; }, null);
-                break;
-            }
+                {
+                    OnGUIError(avatar, "Unknown performance display level.", delegate () { Selection.activeObject = avatar.gameObject; }, null);
+                    break;
+                }
         }
     }
 
-    void OnGUIAvatar(VRCSDK2.VRC_AvatarDescriptor avatar)
+    void OnGUIAvatar(VRC.SDKBase.VRC_AvatarDescriptor avatar)
     {
+        GUILayout.Label("", scrollViewSeparatorStyle);
         EditorGUILayout.Space();
 
         //GUILayout.BeginVertical(boxGuiStyle, GUILayout.Width(SdkWindowWidth));
@@ -1379,13 +2167,29 @@ public partial class VRCSdkControlPanel : EditorWindow
         GUILayout.BeginVertical(GUILayout.Width(200));
         EditorGUILayout.Space();
 
-        GUI.enabled = (GUIErrors.Count == 0 && checkedForIssues) || APIUser.CurrentUser.developerType == APIUser.DeveloperType.Internal;
-        if (GUILayout.Button("Build & Publish"))
+        GUI.enabled = (GUIErrors.Count == 0 && checkedForIssues) || VRC.Core.APIUser.CurrentUser.developerType == VRC.Core.APIUser.DeveloperType.Internal;
+        if (GUILayout.Button(GetBuildAndPublishButtonString()))
         {
-            if (APIUser.CurrentUser.canPublishAvatars)
+            if (VRC.Core.APIUser.CurrentUser.canPublishAvatars)
             {
+                EnvConfig.FogSettings originalFogSettings = EnvConfig.GetFogSettings();
+                EnvConfig.SetFogSettings(new EnvConfig.FogSettings(EnvConfig.FogSettings.FogStrippingMode.Custom, true, true, true));
+
+                #if UNITY_ANDROID
+                EditorPrefs.SetBool("VRC.SDKBase_StripAllShaders", true);
+                #else
+                EditorPrefs.SetBool("VRC.SDKBase_StripAllShaders", false);
+                #endif
+
+#if VRC_SDK_VRCSDK2
                 VRC_SdkBuilder.shouldBuildUnityPackage = VRCSdkControlPanel.FutureProofPublishEnabled;
                 VRC_SdkBuilder.ExportAndUploadAvatarBlueprint(avatar.gameObject);
+#elif VRC_SDK_VRCSDK3
+                VRC.SDK3.Editor.VRC_SdkBuilder.shouldBuildUnityPackage = VRCSdkControlPanel.FutureProofPublishEnabled;
+                VRC.SDK3.Editor.VRC_SdkBuilder.ExportAndUploadAvatarBlueprint(avatar.gameObject);
+#endif
+
+                EnvConfig.SetFogSettings(originalFogSettings);
             }
             else
             {
@@ -1394,19 +2198,18 @@ public partial class VRCSdkControlPanel : EditorWindow
         }
         GUI.enabled = true;
         GUILayout.EndVertical();
-        EditorGUILayout.EndHorizontal();
-        //GUILayout.EndVertical();
+        GUILayout.EndHorizontal();
     }
 
     public static void ShowContentPublishPermissionsDialog()
     {
-        if (!RemoteConfig.IsInitialized())
+        if (!VRC.Core.RemoteConfig.IsInitialized())
         {
-            RemoteConfig.Init(() => ShowContentPublishPermissionsDialog());
+            VRC.Core.RemoteConfig.Init(() => ShowContentPublishPermissionsDialog());
             return;
         }
 
-        string message = RemoteConfig.GetString("sdkNotAllowedToPublishMessage");
+        string message = VRC.Core.RemoteConfig.GetString("sdkNotAllowedToPublishMessage");
         int result = UnityEditor.EditorUtility.DisplayDialogComplex("VRChat SDK", message, "Developer FAQ", "VRChat Discord", "OK");
         if (result == 0)
         {
@@ -1417,4 +2220,31 @@ public partial class VRCSdkControlPanel : EditorWindow
             ShowVRChatDiscord();
         }
     }
+
+    static System.Type postProcessVolumeType;
+    static void DetectPostProcessingPackage()
+    {
+        postProcessVolumeType = null;
+        try
+        {
+            System.Reflection.Assembly postProcAss = System.Reflection.Assembly.Load("Unity.PostProcessing.Runtime");
+            postProcessVolumeType = postProcAss.GetType("UnityEngine.Rendering.PostProcessing.PostProcessVolume");
+        }
+        catch
+        {
+            // -> post processing not installed
+        }
+    }
+
+    private static bool CheckFogSettings()
+    {
+        EnvConfig.FogSettings fogSettings = EnvConfig.GetFogSettings();
+        if(fogSettings.fogStrippingMode == EnvConfig.FogSettings.FogStrippingMode.Automatic)
+        {
+            return false;
+        }
+
+        return fogSettings.keepLinear || fogSettings.keepExp || fogSettings.keepExp2;
+    }
+
 }

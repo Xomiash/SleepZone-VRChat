@@ -1,4 +1,6 @@
-﻿using UnityEngine;
+﻿#if VRC_SDK_VRCSDK2
+
+using UnityEngine;
 using System.Collections;
 using UnityEditor;
 using System;
@@ -20,3 +22,4 @@ public class VRCObjectSyncEditor : Editor
         sync.AllowCollisionTransfer = EditorGUILayout.Toggle("Allow Collision Transfer", sync.AllowCollisionTransfer);
     }
 }
+#endif

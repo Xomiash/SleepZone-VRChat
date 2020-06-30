@@ -128,6 +128,7 @@ namespace VRCSDK2.Validation.Performance.Scanners
             }
             catch(OverflowException e)
             {
+                VRC.Core.Logger.Log("Overflow exception while analyzing geometry, assuming max value:" + e.ToString(), VRC.Core.DebugLevel.All);
                 polyCount = uint.MaxValue;
             }
 

@@ -36,13 +36,37 @@ public partial class VRCSdkControlPanel : EditorWindow
 
     void ShowSettings()
     {
-        settingsScroll = EditorGUILayout.BeginScrollView( settingsScroll, GUILayout.Width(SdkWindowWidth) );
+        GUILayout.BeginHorizontal();
+        GUILayout.FlexibleSpace();
+        GUILayout.BeginVertical();
+
+        settingsScroll = EditorGUILayout.BeginScrollView(settingsScroll, GUILayout.Width(SdkWindowWidth));
 
         EditorGUILayout.BeginVertical(boxGuiStyle);
         EditorGUILayout.LabelField("Developer", EditorStyles.boldLabel);
-        VRCSettings.Get().DisplayAdvancedSettings = EditorGUILayout.ToggleLeft("Show Extra Options on build page and account page",VRCSettings.Get().DisplayAdvancedSettings );
+#if VRC_SDK_VRCSDK2
+        VRCSettings.Get().DisplayAdvancedSettings = EditorGUILayout.ToggleLeft("Show Extra Options on build page and account page", VRCSettings.Get().DisplayAdvancedSettings);
+        bool prevDisplayHelpBoxes = VRCSettings.Get().DisplayHelpBoxes;
+        VRCSettings.Get().DisplayHelpBoxes = EditorGUILayout.ToggleLeft("Show Help Boxes on SDK components", VRCSettings.Get().DisplayHelpBoxes);
+        if (VRCSettings.Get().DisplayHelpBoxes != prevDisplayHelpBoxes)
+#elif VRC_SDK_VRCSDK3
+        VRC.SDK3.Editor.VRCSettings.Get().DisplayAdvancedSettings = EditorGUILayout.ToggleLeft("Show Extra Options on build page and account page", VRC.SDK3.Editor.VRCSettings.Get().DisplayAdvancedSettings);
+        bool prevDisplayHelpBoxes = VRC.SDK3.Editor.VRCSettings.Get().DisplayHelpBoxes;
+        VRC.SDK3.Editor.VRCSettings.Get().DisplayHelpBoxes = EditorGUILayout.ToggleLeft("Show Help Boxes on SDK components", VRC.SDK3.Editor.VRCSettings.Get().DisplayHelpBoxes);
+        if (VRC.SDK3.Editor.VRCSettings.Get().DisplayHelpBoxes != prevDisplayHelpBoxes)
+#endif
+        {
+            Editor[] editors = (Editor[])Resources.FindObjectsOfTypeAll<Editor>();
+            for (int i = 0; i < editors.Length; i++)
+            {
+                editors[i].Repaint();
+            }
+        }
         EditorGUILayout.EndVertical();
 
+        EditorGUILayout.Separator();
+
+        ShowSdk23CompatibilitySettings();
         EditorGUILayout.Separator();
 
         EditorGUILayout.BeginVertical(boxGuiStyle);
@@ -54,6 +78,37 @@ public partial class VRCSdkControlPanel : EditorWindow
             showAvatarPerformanceDetails = showPerfDetails;
             ResetIssues();
         }
+        EditorGUILayout.EndVertical();
+
+        EditorGUILayout.Separator();
+
+        EditorGUILayout.BeginVertical(boxGuiStyle);
+        GUILayout.Label("World Options", EditorStyles.boldLabel);
+        EditorGUILayout.BeginHorizontal();
+        int prevLineMode = triggerLineMode;
+        int lineMode = System.Convert.ToInt32(EditorGUILayout.EnumPopup("Trigger Lines", (VRC.SDKBase.VRC_Trigger.EditorTriggerLineMode)triggerLineMode, GUILayout.Width(250)));
+        if (lineMode != prevLineMode)
+        {
+            triggerLineMode = lineMode;
+            foreach (GameObject t in Selection.gameObjects)
+            {
+                EditorUtility.SetDirty(t);
+            }
+        }
+        GUILayout.Space(10);
+        switch ((VRC.SDKBase.VRC_Trigger.EditorTriggerLineMode)triggerLineMode)
+        {
+            case VRC.SDKBase.VRC_Trigger.EditorTriggerLineMode.Enabled:
+                EditorGUILayout.LabelField("Lines shown for all selected triggers", EditorStyles.miniLabel);
+                break;
+            case VRC.SDKBase.VRC_Trigger.EditorTriggerLineMode.Disabled:
+                EditorGUILayout.LabelField("No trigger lines are drawn", EditorStyles.miniLabel);
+                break;
+            case VRC.SDKBase.VRC_Trigger.EditorTriggerLineMode.PerTrigger:
+                EditorGUILayout.LabelField("Toggle lines directly on each trigger component", EditorStyles.miniLabel);
+                break;
+        }
+        EditorGUILayout.EndHorizontal();
         EditorGUILayout.EndVertical();
 
         // debugging
@@ -136,6 +191,10 @@ public partial class VRCSdkControlPanel : EditorWindow
         }
 
         EditorGUILayout.EndScrollView();
+
+        GUILayout.EndVertical();
+        GUILayout.FlexibleSpace();
+        GUILayout.EndHorizontal();
     }
 
     static void OnVRCInstallPathGUI()
@@ -162,5 +221,84 @@ public partial class VRCSdkControlPanel : EditorWindow
         EditorGUILayout.EndHorizontal();
 
         EditorGUILayout.Separator();
+    }
+
+    static void ShowSdk23CompatibilitySettings()
+    {
+        return;
+
+//        EditorGUILayout.BeginVertical(boxGuiStyle);
+//        EditorGUILayout.LabelField("VRCSDK2 & VRCSDK3 Compatibility", EditorStyles.boldLabel);
+
+//#if !VRC_CLIENT
+//        bool sdk2Present = VRCSdk3Analysis.GetSDKInScene(VRCSdk3Analysis.SdkVersion.VRCSDK2).Count > 0;
+//        bool sdk3Present = VRCSdk3Analysis.GetSDKInScene(VRCSdk3Analysis.SdkVersion.VRCSDK3).Count > 0;
+//        bool sdk2DllActive = VRCSdk3Analysis.IsSdkDllActive(VRCSdk3Analysis.SdkVersion.VRCSDK2);
+//        bool sdk3DllActive = VRCSdk3Analysis.IsSdkDllActive(VRCSdk3Analysis.SdkVersion.VRCSDK3);
+
+//        if ( sdk2DllActive && sdk3DllActive)
+//        {
+//            GUILayout.TextArea("You have not yet configured this project for development with VRCSDK2 and Triggers or VRCSDK3 and Udon. ");
+//            if (sdk2Present && sdk3Present)
+//            {
+//                GUILayout.TextArea("This scene contains both SDK2 and SDK3 elements. " +
+//                    "Please modify this scene to contain only one type or the other before completing your configuration.");
+//            }
+//            else if (sdk2Present)
+//            {
+//                GUILayout.TextArea("This scene contains SDK2 scripts. " +
+//                    "Check below to configure this project for use with VRCSDK2 or remove your VRCSDK2 scripts to upgrade to VRCSDK3");
+//                bool downgrade = EditorGUILayout.ToggleLeft("Configure for use with VRCSDK2 and Triggers", false);
+//                if (downgrade)
+//                    VRCSdk3Analysis.SetSdkVersionActive(VRCSdk3Analysis.SdkVersion.VRCSDK2);
+//            }
+//            else if (sdk3Present)
+//            {
+//                GUILayout.TextArea("This scene contains only SDK3 scripts and it ready to upgrade. " +
+//                    "Click below to get started.");
+//                bool upgrade = EditorGUILayout.ToggleLeft("Configure for use with VRCSDK3 and Udon - Let's Rock!", false);
+//                if (upgrade)
+//                    VRCSdk3Analysis.SetSdkVersionActive(VRCSdk3Analysis.SdkVersion.VRCSDK3);
+//            }
+//            else
+//            {
+//                GUILayout.TextArea("This scene is a blank slate. " +
+//                    "Click below to get started.");
+//                bool upgrade = EditorGUILayout.ToggleLeft("Configure for use with VRCSDK3 and Udon - Let's Rock!", false);
+//                if (upgrade)
+//                    VRCSdk3Analysis.SetSdkVersionActive(VRCSdk3Analysis.SdkVersion.VRCSDK3);
+//            }
+//        }
+//        else if (sdk2DllActive)
+//        {
+//            GUILayout.TextArea("This project has been configured to be built with VRCSDK2. " +
+//                "To upgrade, VRCSDK3 must be enabled here.");
+//            bool upgrade = EditorGUILayout.ToggleLeft("VRCSDK3 Scripts can be used", false);
+//            if (upgrade)
+//                VRCSdk3Analysis.SetSdkVersionActive(VRCSdk3Analysis.SdkVersion.VRCSDK3);
+//        }
+//        else if (sdk3DllActive)
+//        {
+//            GUILayout.TextArea("This project has been configured to be built with VRCSDK3. " +
+//                "Congratulations, you're ready to go. " +
+//                "You can still downgrade by activating VRCSDK2 here.");
+//            bool downgrade = EditorGUILayout.ToggleLeft("VRCSDK2 Scripts can be used", false);
+//            if (downgrade)
+//                VRCSdk3Analysis.SetSdkVersionActive(VRCSdk3Analysis.SdkVersion.VRCSDK2);
+//        }
+//        else
+//        {
+//            GUILayout.TextArea("Somehow you have disabled both VRCSDK2 and VRCSDK3. Oops. " +
+//                "Click here to begin development with VRCSDK3.");
+//            bool begin = EditorGUILayout.ToggleLeft("VRCSDK3 Scripts can be used", false);
+//            if (begin)
+//                VRCSdk3Analysis.SetSdkVersionActive(VRCSdk3Analysis.SdkVersion.VRCSDK3);
+//        }
+//#else
+//        GUILayout.TextArea("I think you're in the main VRChat project. " +
+//            "You should not be enabling or disabling SDKs from here.");
+//#endif
+
+//        EditorGUILayout.EndVertical();
     }
 }

@@ -100,9 +100,11 @@ namespace VRCSDK2.Validation.Performance.Stats
 
         private static string GetPlatformPerformanceStatLevels()
         {
-            return VRC.ValidationHelpers.IsStandalonePlatform()
-                ? "Validation/Performance/StatsLevels/Windows/AvatarPerformanceStatLevels_Windows"
-                : "Validation/Performance/StatsLevels/Quest/AvatarPerformanceStatLevels_Quest";
+#if UNITY_ANDROID
+            return "Validation/Performance/StatsLevels/Quest/AvatarPerformanceStatLevels_Quest";
+#else
+            return "Validation/Performance/StatsLevels/Windows/AvatarPerformanceStatLevels_Windows";
+#endif
         }
 
         #endregion

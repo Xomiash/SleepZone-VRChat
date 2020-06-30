@@ -1,4 +1,5 @@
-﻿#if UNITY_EDITOR
+﻿#if VRC_SDK_VRCSDK2
+#if UNITY_EDITOR
 
 using UnityEngine;
 using UnityEngine.UI;
@@ -34,10 +35,10 @@ namespace VRCSDK2
             Rect objectRect = new Rect(rect.x, rect.y, rect.width / 2 - 5, rect.height);
             Rect nameRect = new Rect(rect.x + rect.width / 2, rect.y, rect.width / 2, rect.height);
 
-            VRC_Trigger current = null;
+            VRCSDK2.VRC_Trigger current = null;
             if (objectProperty.objectReferenceValue != null)
-                current = (objectProperty.objectReferenceValue as GameObject).GetComponent<VRC_Trigger>();
-            current = EditorGUI.ObjectField(objectRect, current, typeof(VRC_Trigger), true) as VRC_Trigger;
+                current = (objectProperty.objectReferenceValue as GameObject).GetComponent<VRCSDK2.VRC_Trigger>();
+            current = EditorGUI.ObjectField(objectRect, current, typeof(VRCSDK2.VRC_Trigger), true) as VRCSDK2.VRC_Trigger;
             objectProperty.objectReferenceValue = current == null ? null : current.gameObject;
 
             VRC_EditorTools.CustomTriggerPopup(nameRect, objectProperty, nameProperty);
@@ -49,18 +50,18 @@ namespace VRCSDK2
     [CustomEditor(typeof(VRCSDK2.VRC_Trigger)), CanEditMultipleObjects]
     public class VRC_TriggerEditor : Editor
     {
-        private List<VRC_Trigger.TriggerType> ActiveTypes
+        private List<VRCSDK2.VRC_Trigger.TriggerType> ActiveTypes
         {
             get
             {
-                List<VRC_Trigger.TriggerType> activeTypes = new List<VRC_Trigger.TriggerType>();
+                List<VRCSDK2.VRC_Trigger.TriggerType> activeTypes = new List<VRCSDK2.VRC_Trigger.TriggerType>();
 
                 SerializedProperty triggers = triggersProperty.Copy();
                 int triggersLength = triggers.arraySize;
 
                 for (int idx = 0; idx < triggersLength; ++idx)
                 {
-                    VRC_Trigger.TriggerType triggerType = (VRC_Trigger.TriggerType)triggers.GetArrayElementAtIndex(idx).FindPropertyRelative("TriggerType").intValue;
+                    VRCSDK2.VRC_Trigger.TriggerType triggerType = (VRCSDK2.VRC_Trigger.TriggerType)triggers.GetArrayElementAtIndex(idx).FindPropertyRelative("TriggerType").intValue;
                     activeTypes.Add(triggerType);
                 }
 
@@ -69,12 +70,11 @@ namespace VRCSDK2
         }
 
 #pragma warning disable CS0618 // Type or member is obsolete
-        private static List<VRC_Trigger.TriggerType> hiddenTriggerTypes = new List<VRC_Trigger.TriggerType> { VRC_Trigger.TriggerType.OnDataStorageAdd, VRC_Trigger.TriggerType.OnDataStorageRemove };
-        private static List<VRC_EventHandler.VrcEventType> hiddenEventTypes = new List<VRC_EventHandler.VrcEventType> { VRC_EventHandler.VrcEventType.MeshVisibility, VRC_EventHandler.VrcEventType.SendMessage, VRC_EventHandler.VrcEventType.RunConsoleCommand };
-        private static List<VRC_EventHandler.VrcBroadcastType> unbufferedBroadcastTypes = new List<VRC_EventHandler.VrcBroadcastType> { VRC_EventHandler.VrcBroadcastType.AlwaysUnbuffered, VRC_EventHandler.VrcBroadcastType.MasterUnbuffered, VRC_EventHandler.VrcBroadcastType.OwnerUnbuffered, VRC_EventHandler.VrcBroadcastType.Local };
-        private static List<VRC_EventHandler.VrcBroadcastType> bufferOneBroadcastTypes = new List<VRC_EventHandler.VrcBroadcastType> { VRC_EventHandler.VrcBroadcastType.AlwaysBufferOne, VRC_EventHandler.VrcBroadcastType.MasterBufferOne, VRC_EventHandler.VrcBroadcastType.OwnerBufferOne };
-        private static List<VRC_EventHandler.VrcBroadcastType> simpleBroadcastTypes = new List<VRC_EventHandler.VrcBroadcastType> { VRC_EventHandler.VrcBroadcastType.AlwaysUnbuffered, VRC_EventHandler.VrcBroadcastType.AlwaysBufferOne, VRC_EventHandler.VrcBroadcastType.OwnerBufferOne, VRC_EventHandler.VrcBroadcastType.OwnerUnbuffered };
-        private static List<VRC_EventHandler.VrcBroadcastType> hiddenBroadcastTypes = new List<VRC_EventHandler.VrcBroadcastType> { };
+        private static List<VRCSDK2.VRC_Trigger.TriggerType> hiddenTriggerTypes = new List<VRCSDK2.VRC_Trigger.TriggerType> { /*VRCSDK2.VRC_Trigger.TriggerType.OnDataStorageAdd, VRCSDK2.VRC_Trigger.TriggerType.OnDataStorageRemove*/ };
+        private static List<VRCSDK2.VRC_EventHandler.VrcEventType> hiddenEventTypes = new List<VRCSDK2.VRC_EventHandler.VrcEventType> { VRCSDK2.VRC_EventHandler.VrcEventType.MeshVisibility, VRCSDK2.VRC_EventHandler.VrcEventType.SendMessage, VRCSDK2.VRC_EventHandler.VrcEventType.RunConsoleCommand };
+        private static List<VRCSDK2.VRC_EventHandler.VrcBroadcastType> unbufferedBroadcastTypes = new List<VRCSDK2.VRC_EventHandler.VrcBroadcastType> { VRCSDK2.VRC_EventHandler.VrcBroadcastType.AlwaysUnbuffered, VRCSDK2.VRC_EventHandler.VrcBroadcastType.MasterUnbuffered, VRCSDK2.VRC_EventHandler.VrcBroadcastType.OwnerUnbuffered, VRCSDK2.VRC_EventHandler.VrcBroadcastType.Local };
+        private static List<VRCSDK2.VRC_EventHandler.VrcBroadcastType> bufferOneBroadcastTypes = new List<VRCSDK2.VRC_EventHandler.VrcBroadcastType> { VRCSDK2.VRC_EventHandler.VrcBroadcastType.AlwaysBufferOne, VRCSDK2.VRC_EventHandler.VrcBroadcastType.MasterBufferOne, VRCSDK2.VRC_EventHandler.VrcBroadcastType.OwnerBufferOne };
+        private static List<VRCSDK2.VRC_EventHandler.VrcBroadcastType> hiddenBroadcastTypes = new List<VRCSDK2.VRC_EventHandler.VrcBroadcastType> { };
 #pragma warning restore CS0618 // Type or member is obsolete
 
         private ReorderableList[] eventLists = new ReorderableList[0];
@@ -85,13 +85,12 @@ namespace VRCSDK2
         private SerializedProperty triggersProperty;
         private SerializedProperty proximityProperty;
         private SerializedProperty interactTextProperty;
-        private SerializedProperty advancedProperty;
         private SerializedProperty ownershipProperty;
-        private SerializedProperty helpProperty;
+        private SerializedProperty drawLinesProperty;
 
         private Dictionary<string, object[]> rpcByteCache = new Dictionary<string, object[]>();
 
-        private VRC_Trigger.TriggerType addTriggerSelectedType = VRC_Trigger.TriggerType.Custom;
+        private VRCSDK2.VRC_Trigger.TriggerType addTriggerSelectedType = VRCSDK2.VRC_Trigger.TriggerType.Custom;
 
         private void OnEnable()
         {
@@ -102,7 +101,7 @@ namespace VRCSDK2
         {
 #pragma warning disable CS0618 // Type or member is obsolete
             bool showedOldWarning = false;
-            foreach (VRC_Trigger t in targets.Cast<VRC_Trigger>().Where(tr => tr != null))
+            foreach (VRCSDK2.VRC_Trigger t in targets.Cast<VRCSDK2.VRC_Trigger>().Where(tr => tr != null))
             {
                 if (!showedOldWarning && (t.GetComponent<VRCSDK2.VRC_UseEvents>() != null || t.GetComponent<VRCSDK2.VRC_KeyEvents>() != null || t.GetComponent<VRCSDK2.VRC_TriggerColliderEventTrigger>() != null || t.GetComponent<VRCSDK2.VRC_TimedEvents>() != null))
                 {
@@ -111,16 +110,15 @@ namespace VRCSDK2
                 }
                 VRCSDK2.VRC_EventHandler handler = t.GetComponent<VRCSDK2.VRC_EventHandler>();
                 if (handler != null)
-                    handler.Events = new List<VRC_EventHandler.VrcEvent>();
+                    handler.Events = new List<VRCSDK2.VRC_EventHandler.VrcEvent>();
             }
 #pragma warning restore CS0618 // Type or member is obsolete
 
             triggersProperty = serializedObject.FindProperty("Triggers");
             proximityProperty = serializedObject.FindProperty("proximity");
             interactTextProperty = serializedObject.FindProperty("interactText");
-            advancedProperty = serializedObject.FindProperty("UsesAdvancedOptions");
             ownershipProperty = serializedObject.FindProperty("TakesOwnershipIfNecessary");
-            helpProperty = serializedObject.FindProperty("ShowHelp");
+            drawLinesProperty = serializedObject.FindProperty("DrawLines");
 
             serializedObject.Update();
 
@@ -148,13 +146,26 @@ namespace VRCSDK2
 
             EditorGUILayout.BeginVertical(GUILayout.MaxWidth(EditorGUIUtility.currentViewWidth - 30));
 
-            EditorGUILayout.PropertyField(advancedProperty, new GUIContent("Advanced Mode"));
+            EditorGUILayout.Space();
+
             EditorGUILayout.PropertyField(ownershipProperty, new GUIContent("Take Ownership of Action Targets"));
-            EditorGUILayout.PropertyField(helpProperty, new GUIContent("Show Help"));
+            VRCSDK2.VRC_Trigger.EditorGlobalTriggerLineMode = (VRCSDK2.VRC_Trigger.EditorTriggerLineMode)EditorPrefs.GetInt("VRCSDK2_triggerLineMode", 0);
+            if (VRCSDK2.VRC_Trigger.EditorGlobalTriggerLineMode == VRCSDK2.VRC_Trigger.EditorTriggerLineMode.PerTrigger)
+                EditorGUILayout.PropertyField(drawLinesProperty, new GUIContent("Draw Lines"));
 
             EditorGUILayout.Space();
 
             RenderTriggers();
+
+            EditorGUILayout.Space();
+
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Space(10);
+            EditorGUILayout.BeginVertical();
+
+            EditorGUILayout.EndVertical();
+            EditorGUILayout.EndHorizontal();
+
             EditorGUILayout.EndVertical();
 
             serializedObject.ApplyModifiedProperties();
@@ -162,7 +173,7 @@ namespace VRCSDK2
 
         private void RenderHelpBox(string message, MessageType messageType)
         {
-            if (helpProperty.boolValue || messageType == MessageType.Error)
+            if (VRCSettings.Get().DisplayHelpBoxes || messageType == MessageType.Error || messageType == MessageType.Warning)
                 EditorGUILayout.HelpBox(message, messageType);
         }
 
@@ -195,9 +206,9 @@ namespace VRCSDK2
                     continue;
                 }
 
-                if (!unbufferedBroadcastTypes.Contains((VRC_EventHandler.VrcBroadcastType)broadcastProperty.intValue) &&
-                    !bufferOneBroadcastTypes.Contains((VRC_EventHandler.VrcBroadcastType)broadcastProperty.intValue) &&
-                    ActiveEvents(triggerProperty).Any(e => e == VRC_EventHandler.VrcEventType.SendRPC))
+                if (!unbufferedBroadcastTypes.Contains((VRCSDK2.VRC_EventHandler.VrcBroadcastType)broadcastProperty.intValue) &&
+                    !bufferOneBroadcastTypes.Contains((VRCSDK2.VRC_EventHandler.VrcBroadcastType)broadcastProperty.intValue) &&
+                    ActiveEvents(triggerProperty).Any(e => e == VRCSDK2.VRC_EventHandler.VrcEventType.SendRPC))
                     RenderHelpBox("Consider using unbuffered broadcasts with RPCs.", MessageType.Error);
 
                 EditorGUILayout.Separator();
@@ -208,7 +219,7 @@ namespace VRCSDK2
                 {
                     EditorGUILayout.Separator();
 
-                    if (triggerProperty.FindPropertyRelative("TriggerType").intValue != (int)VRC_Trigger.TriggerType.Relay)
+                    if (triggerProperty.FindPropertyRelative("TriggerType").intValue != (int)VRCSDK2.VRC_Trigger.TriggerType.Relay)
                     {
                         RenderTriggerEventsEditor(triggerProperty, idx);
 
@@ -227,40 +238,40 @@ namespace VRCSDK2
         private void RenderTriggerEditor(SerializedProperty triggerProperty, int idx)
         {
             EditorGUILayout.PropertyField(triggerProperty.FindPropertyRelative("AfterSeconds"), new GUIContent("Delay in Seconds"));
-            
+
             VRC_Trigger.TriggerType triggerType = (VRC_Trigger.TriggerType)triggerProperty.FindPropertyRelative("TriggerType").intValue;
             switch (triggerType)
             {
-                case VRC_Trigger.TriggerType.Custom:
+                case VRCSDK2.VRC_Trigger.TriggerType.Custom:
                     RenderCustom(triggerProperty);
                     break;
-                case VRC_Trigger.TriggerType.Relay:
+                case VRCSDK2.VRC_Trigger.TriggerType.Relay:
                     RenderRelay(triggerProperty, idx);
                     break;
-                case VRC_Trigger.TriggerType.OnEnterTrigger:
-                case VRC_Trigger.TriggerType.OnExitTrigger:
-                case VRC_Trigger.TriggerType.OnEnterCollider:
-                case VRC_Trigger.TriggerType.OnExitCollider:
+                case VRCSDK2.VRC_Trigger.TriggerType.OnEnterTrigger:
+                case VRCSDK2.VRC_Trigger.TriggerType.OnExitTrigger:
+                case VRCSDK2.VRC_Trigger.TriggerType.OnEnterCollider:
+                case VRCSDK2.VRC_Trigger.TriggerType.OnExitCollider:
                     RenderCollider(triggerProperty);
                     break;
-                case VRC_Trigger.TriggerType.OnKeyDown:
-                case VRC_Trigger.TriggerType.OnKeyUp:
+                case VRCSDK2.VRC_Trigger.TriggerType.OnKeyDown:
+                case VRCSDK2.VRC_Trigger.TriggerType.OnKeyUp:
                     RenderKey(triggerProperty);
                     break;
-                case VRC_Trigger.TriggerType.OnTimer:
+                case VRCSDK2.VRC_Trigger.TriggerType.OnTimer:
                     RenderTimer(triggerProperty);
                     break;
-                case VRC_Trigger.TriggerType.OnDataStorageAdd:
-                case VRC_Trigger.TriggerType.OnDataStorageChange:
-                case VRC_Trigger.TriggerType.OnDataStorageRemove:
+                case VRCSDK2.VRC_Trigger.TriggerType.OnDataStorageChange:
+                    // case VRCSDK2.VRC_Trigger.TriggerType.OnDataStorageAdd:
+                    // case VRCSDK2.VRC_Trigger.TriggerType.OnDataStorageRemove:
                     RenderDataStorage(triggerProperty);
                     break;
-                case VRC_Trigger.TriggerType.OnParticleCollision:
+                case VRCSDK2.VRC_Trigger.TriggerType.OnParticleCollision:
                     //RenderHelpBox("Triggers for each particle in attached particle system that collides with something.", MessageType.Info); 
-                    RenderEmpty(triggerProperty);
+                    RenderCollider(triggerProperty);
                     break;
                 default:
-                    if (VRC_Trigger.TypeCollections.InteractiveTypes.Contains(triggerType) || VRC_Trigger.TypeCollections.PickupTypes.Contains(triggerType))
+                    if (VRCSDK2.VRC_Trigger.TypeCollections.InteractiveTypes.Contains(triggerType) || VRCSDK2.VRC_Trigger.TypeCollections.PickupTypes.Contains(triggerType))
                         RenderInteractableEditor();
                     else
                         RenderEmpty(triggerProperty);
@@ -268,16 +279,16 @@ namespace VRCSDK2
             }
         }
 
-        private List<VRC_EventHandler.VrcEventType> ActiveEvents(SerializedProperty triggerProperty)
+        private List<VRCSDK2.VRC_EventHandler.VrcEventType> ActiveEvents(SerializedProperty triggerProperty)
         {
-            List<VRC_EventHandler.VrcEventType> activeTypes = new List<VRC_EventHandler.VrcEventType>();
+            List<VRCSDK2.VRC_EventHandler.VrcEventType> activeTypes = new List<VRCSDK2.VRC_EventHandler.VrcEventType>();
 
             SerializedProperty events = triggerProperty.FindPropertyRelative("Events").Copy();
             int eventsLength = events.arraySize;
 
             for (int idx = 0; idx < eventsLength; ++idx)
             {
-                VRC_EventHandler.VrcEventType eventType = (VRC_EventHandler.VrcEventType)events.GetArrayElementAtIndex(idx).FindPropertyRelative("EventType").intValue;
+                VRCSDK2.VRC_EventHandler.VrcEventType eventType = (VRCSDK2.VRC_EventHandler.VrcEventType)events.GetArrayElementAtIndex(idx).FindPropertyRelative("EventType").intValue;
                 activeTypes.Add(eventType);
             }
 
@@ -292,9 +303,9 @@ namespace VRCSDK2
             Rect selectedRect = new Rect(rect.x, rect.y, rect.width / 4 * 3 - 5, rect.height);
             Rect addRect = new Rect(selectedRect.x + selectedRect.width + 5, rect.y, rect.width / 4, rect.height);
 
-            bool showStationTypes = serializedObject.targetObjects.Any(o => (o as VRC_Trigger).GetComponent<VRCSDK2.VRC_Station>() != null);
-            System.Func<VRC_Trigger.TriggerType, bool> predicate =
-                v => hiddenTriggerTypes.Contains(v) == false && (showStationTypes || (v != VRC_Trigger.TriggerType.OnStationEntered && v != VRC_Trigger.TriggerType.OnStationExited));
+            bool showStationTypes = serializedObject.targetObjects.Any(o => (o as VRCSDK2.VRC_Trigger).GetComponent<VRCSDK2.VRC_Station>() != null);
+            System.Func<VRCSDK2.VRC_Trigger.TriggerType, bool> predicate =
+                v => hiddenTriggerTypes.Contains(v) == false && (showStationTypes || (v != VRCSDK2.VRC_Trigger.TriggerType.OnStationEntered && v != VRCSDK2.VRC_Trigger.TriggerType.OnStationExited));
 
             addTriggerSelectedType = VRC_EditorTools.FilteredEnumPopup(selectedRect, addTriggerSelectedType, predicate);
 
@@ -314,7 +325,7 @@ namespace VRCSDK2
                     triggersAry.Next(false);
 
                 triggersAry.FindPropertyRelative("TriggerType").intValue = (int)addTriggerSelectedType;
-                triggersAry.FindPropertyRelative("BroadcastType").intValue = (int)VRC_EventHandler.VrcBroadcastType.AlwaysBufferOne;
+                triggersAry.FindPropertyRelative("BroadcastType").intValue = (int)VRCSDK2.VRC_EventHandler.VrcBroadcastType.AlwaysBufferOne;
                 triggersAry.FindPropertyRelative("TriggerIndividuals").boolValue = true;
                 triggersAry.FindPropertyRelative("Layers").intValue = LayerMask.GetMask("Default");
             }
@@ -328,11 +339,11 @@ namespace VRCSDK2
 
             if (!delete)
             {
-                VRC_EventHandler.VrcBroadcastType? broadcast = null;
+                VRCSDK2.VRC_EventHandler.VrcBroadcastType? broadcast = null;
 
                 Rect rect = EditorGUILayout.BeginHorizontal(GUILayout.Height(15f));
                 EditorGUILayout.Space();
-                
+
                 int baseWidth = (int)((rect.width - 40) / 4);
 
                 Rect foldoutRect = new Rect(rect.x + 10, rect.y, 20, rect.height);
@@ -344,41 +355,44 @@ namespace VRCSDK2
                 expand = EditorGUI.Foldout(foldoutRect, expand, GUIContent.none);
 
                 SerializedProperty triggerTypeProperty = triggerProperty.FindPropertyRelative("TriggerType");
-                VRC_Trigger.TriggerType currentType = (VRC_Trigger.TriggerType)triggerTypeProperty.intValue;
+                VRCSDK2.VRC_Trigger.TriggerType currentType = (VRCSDK2.VRC_Trigger.TriggerType)triggerTypeProperty.intValue;
 
                 SerializedProperty nameProperty = triggerProperty.FindPropertyRelative("Name");
                 if (string.IsNullOrEmpty(nameProperty.stringValue))
                     nameProperty.stringValue = "Unnamed";
 
-                bool showStationTypes = serializedObject.targetObjects.Any(o => (o as VRC_Trigger).GetComponent<VRCSDK2.VRC_Station>() != null);
+                bool showStationTypes = serializedObject.targetObjects.Any(o => (o as VRCSDK2.VRC_Trigger).GetComponent<VRCSDK2.VRC_Station>() != null);
                 System.Func<string, string> rename = s => s == "Custom" ? s + " (" + nameProperty.stringValue + ")" : s;
-                System.Func<VRC_Trigger.TriggerType, bool> predicate =
-                    v => hiddenTriggerTypes.Contains(v) == false && (showStationTypes || (v != VRC_Trigger.TriggerType.OnStationEntered && v != VRC_Trigger.TriggerType.OnStationExited));
+                System.Func<VRCSDK2.VRC_Trigger.TriggerType, bool> predicate =
+                    v => hiddenTriggerTypes.Contains(v) == false && (showStationTypes || (v != VRCSDK2.VRC_Trigger.TriggerType.OnStationEntered && v != VRCSDK2.VRC_Trigger.TriggerType.OnStationExited));
 
                 triggerTypeProperty.intValue = (int)VRC_EditorTools.FilteredEnumPopup(typeRect, currentType, predicate, rename);
-                currentType = (VRC_Trigger.TriggerType)triggerTypeProperty.intValue;
+                currentType = (VRCSDK2.VRC_Trigger.TriggerType)triggerTypeProperty.intValue;
 
                 SerializedProperty broadcastTypeProperty = triggerProperty.FindPropertyRelative("BroadcastType");
-                List<VRC_EventHandler.VrcEventType> activeEvents = ActiveEvents(triggerProperty);
-                if ((VRC_Trigger.TriggerType)triggerTypeProperty.intValue == VRC_Trigger.TriggerType.Relay || activeEvents.Contains(VRC_EventHandler.VrcEventType.SpawnObject))
+                List<VRCSDK2.VRC_EventHandler.VrcEventType> activeEvents = ActiveEvents(triggerProperty);
+                if ((VRCSDK2.VRC_Trigger.TriggerType)triggerTypeProperty.intValue == VRCSDK2.VRC_Trigger.TriggerType.Relay || activeEvents.Contains(VRCSDK2.VRC_EventHandler.VrcEventType.SpawnObject))
                 {
-                    broadcast = VRC_EventHandler.VrcBroadcastType.Always;
+                    broadcast = VRCSDK2.VRC_EventHandler.VrcBroadcastType.Always;
                     broadcastTypeProperty.intValue = (int)broadcast;
                 }
                 else
                 {
-                    VRC_EditorTools.FilteredEnumPopup<VRC_EventHandler.VrcBroadcastType>(broadcastRect, broadcastTypeProperty, b => !hiddenBroadcastTypes.Contains(b) && (advancedProperty.boolValue || simpleBroadcastTypes.Contains(b)));
-                    broadcast = (VRC_EventHandler.VrcBroadcastType)broadcastTypeProperty.intValue;
+                    VRC_EditorTools.FilteredEnumPopup<VRCSDK2.VRC_EventHandler.VrcBroadcastType>(broadcastRect, broadcastTypeProperty, b => !hiddenBroadcastTypes.Contains(b));
+                    broadcast = (VRCSDK2.VRC_EventHandler.VrcBroadcastType)broadcastTypeProperty.intValue;
                 }
 
                 SerializedProperty probabilitiesProperty = triggerProperty.FindPropertyRelative("Probabilities");
                 SerializedProperty probabilityLockProperty = triggerProperty.FindPropertyRelative("ProbabilityLock");
                 SerializedProperty eventsProperty = triggerProperty.FindPropertyRelative("Events");
 
-                if (advancedProperty.boolValue && GUI.Toggle(randomRect, probabilitiesProperty.arraySize > 0, new GUIContent(" Randomize")))
+                if (triggerProperty.FindPropertyRelative("Events").arraySize < 1)
+                    GUI.enabled = false;
+                if (GUI.Toggle(randomRect, probabilitiesProperty.arraySize > 0, new GUIContent(" Randomize")))
                     probabilityLockProperty.arraySize = probabilitiesProperty.arraySize = eventsProperty.arraySize;
                 else
                     probabilityLockProperty.arraySize = probabilitiesProperty.arraySize = 0;
+                GUI.enabled = true;
 
                 if (GUI.Button(removeRect, "Remove"))
                     delete = true;
@@ -390,34 +404,34 @@ namespace VRCSDK2
                     string message = null;
                     switch (broadcast.Value)
                     {
-                        case VRC_EventHandler.VrcBroadcastType.Always:
+                        case VRCSDK2.VRC_EventHandler.VrcBroadcastType.Always:
                             message = "All are able to activate the trigger for everyone, and late-joiners will also trigger it.";
                             break;
-                        case VRC_EventHandler.VrcBroadcastType.AlwaysUnbuffered:
+                        case VRCSDK2.VRC_EventHandler.VrcBroadcastType.AlwaysUnbuffered:
                             message = "All are able to activate the trigger for everyone, but late-joiners will not trigger it.";
                             break;
-                        case VRC_EventHandler.VrcBroadcastType.Local:
+                        case VRCSDK2.VRC_EventHandler.VrcBroadcastType.Local:
                             message = "All are able to activate the trigger for themselves only.";
                             break;
-                        case VRC_EventHandler.VrcBroadcastType.Master:
+                        case VRCSDK2.VRC_EventHandler.VrcBroadcastType.Master:
                             message = "Only the Master is able to activate the trigger for everyone, and late-joiners will also trigger it.";
                             break;
-                        case VRC_EventHandler.VrcBroadcastType.MasterUnbuffered:
+                        case VRCSDK2.VRC_EventHandler.VrcBroadcastType.MasterUnbuffered:
                             message = "Only the Master is able to activate the trigger for everyone, but late-joiners will not trigger it.";
                             break;
-                        case VRC_EventHandler.VrcBroadcastType.Owner:
+                        case VRCSDK2.VRC_EventHandler.VrcBroadcastType.Owner:
                             message = "Only the Owner is able to activate the trigger for everyone, and late-joiners will also trigger it.";
                             break;
-                        case VRC_EventHandler.VrcBroadcastType.OwnerUnbuffered:
+                        case VRCSDK2.VRC_EventHandler.VrcBroadcastType.OwnerUnbuffered:
                             message = "Only the Owner is able to activate the trigger for everyone, but late-joiners will not trigger it.";
                             break;
-                        case VRC_EventHandler.VrcBroadcastType.AlwaysBufferOne:
+                        case VRCSDK2.VRC_EventHandler.VrcBroadcastType.AlwaysBufferOne:
                             message = "All are able to activate the trigger for everyone, and late-joiners will trigger the most recent one.";
                             break;
-                        case VRC_EventHandler.VrcBroadcastType.MasterBufferOne:
+                        case VRCSDK2.VRC_EventHandler.VrcBroadcastType.MasterBufferOne:
                             message = "Only the Master is able to activate the trigger for everyone, and late-joiners will trigger the most recent one.";
                             break;
-                        case VRC_EventHandler.VrcBroadcastType.OwnerBufferOne:
+                        case VRCSDK2.VRC_EventHandler.VrcBroadcastType.OwnerBufferOne:
                             message = "Only the Owner is able to activate the trigger for everyone, and late-joiners will trigger the most recent one.";
                             break;
                     }
@@ -456,11 +470,11 @@ namespace VRCSDK2
                     SerializedProperty eventTypeProperty = eventProperty.FindPropertyRelative("EventType");
                     SerializedProperty parameterStringProperty = eventProperty.FindPropertyRelative("ParameterString");
 
-                    string label = ((VRC_EventHandler.VrcEventType)eventTypeProperty.intValue).ToString();
+                    string label = ((VRCSDK2.VRC_EventHandler.VrcEventType)eventTypeProperty.intValue).ToString();
                     if (!string.IsNullOrEmpty(parameterStringProperty.stringValue))
                         label += " (" + parameterStringProperty.stringValue + ")";
 
-                    if (probabilitiesProperty.arraySize == 0 || !advancedProperty.boolValue)
+                    if (probabilitiesProperty.arraySize == 0)
                         EditorGUI.LabelField(rect, label);
                     else
                     {
@@ -469,7 +483,7 @@ namespace VRCSDK2
                         Rect sliderRect = new Rect(rect.x + rect.width / 2 + 30, rect.y, rect.width / 2 - 30, rect.height);
 
                         EditorGUI.LabelField(labelRect, label);
-                        
+
                         probabilityLockProperty.GetArrayElementAtIndex(index).boolValue = GUI.Toggle(sliderLockRect, probabilityLockProperty.GetArrayElementAtIndex(index).boolValue, new GUIContent());
                         probabilitiesProperty.GetArrayElementAtIndex(index).floatValue = EditorGUI.Slider(sliderRect, new GUIContent(), probabilitiesProperty.GetArrayElementAtIndex(index).floatValue, 0f, 1f);
 
@@ -515,7 +529,7 @@ namespace VRCSDK2
                             for (int pIdx = 0; pIdx < probabilitiesProperty.arraySize; ++pIdx)
                                 probabilitySum += probabilitiesProperty.GetArrayElementAtIndex(pIdx).floatValue;
                             loopIterations++;
-                        } while ((probabilitySum > 1f) && (loopIterations<MAX_SCALE_PROBABILITIES_LOOP_ITERATIONS));
+                        } while ((probabilitySum > 1f) && (loopIterations < MAX_SCALE_PROBABILITIES_LOOP_ITERATIONS));
                     }
 
                     if (isFocused)
@@ -531,13 +545,14 @@ namespace VRCSDK2
                 {
                     GenericMenu menu = new GenericMenu();
                     SerializedProperty eventsList = triggerProperty.FindPropertyRelative("Events");
-                    foreach (VRC_EventHandler.VrcEventType type in System.Enum.GetValues(typeof(VRC_EventHandler.VrcEventType)).Cast<VRC_EventHandler.VrcEventType>().Where(v => !hiddenEventTypes.Contains(v) && !(v == VRC_EventHandler.VrcEventType.SendRPC && !advancedProperty.boolValue)).OrderBy(et => System.Enum.GetName(typeof(VRC_EventHandler.VrcEventType), et)))
+                    foreach (VRCSDK2.VRC_EventHandler.VrcEventType type in System.Enum.GetValues(typeof(VRCSDK2.VRC_EventHandler.VrcEventType)).Cast<VRCSDK2.VRC_EventHandler.VrcEventType>().Where(v => !hiddenEventTypes.Contains(v)).OrderBy(et => System.Enum.GetName(typeof(VRCSDK2.VRC_EventHandler.VrcEventType), et)))
                     {
-                        menu.AddItem(new GUIContent("Basic Events/" + type.ToString()), false, (t) => {
+                        menu.AddItem(new GUIContent("Basic Events/" + type.ToString()), false, (t) =>
+                        {
                             eventsList.arraySize++;
 
                             SerializedProperty newEventProperty = eventsList.GetArrayElementAtIndex(eventsList.arraySize - 1);
-                            newEventProperty.FindPropertyRelative("EventType").intValue = (int)(VRC_EventHandler.VrcEventType)t;
+                            newEventProperty.FindPropertyRelative("EventType").intValue = (int)(VRCSDK2.VRC_EventHandler.VrcEventType)t;
                             newEventProperty.FindPropertyRelative("ParameterObjects").arraySize = 0;
                             newEventProperty.FindPropertyRelative("ParameterInt").intValue = 0;
                             newEventProperty.FindPropertyRelative("ParameterFloat").floatValue = 0f;
@@ -546,16 +561,17 @@ namespace VRCSDK2
                             serializedObject.ApplyModifiedProperties();
                         }, type);
                     }
-                    VRCSDK2.IVRCEventProvider[] providers = FindObjectsOfType<MonoBehaviour>().Where(b => b is IVRCEventProvider).Cast<IVRCEventProvider>().ToArray();
-                    foreach (VRCSDK2.IVRCEventProvider provider in providers)
+                    VRC.SDKBase.IVRCEventProvider[] providers = FindObjectsOfType<MonoBehaviour>().Where(b => b is VRC.SDKBase.IVRCEventProvider).Cast<VRC.SDKBase.IVRCEventProvider>().ToArray();
+                    foreach (VRC.SDKBase.IVRCEventProvider provider in providers)
                     {
-                        foreach (VRC_EventHandler.VrcEvent evt in provider.ProvideEvents())
+                        foreach (VRCSDK2.VRC_EventHandler.VrcEvent evt in provider.ProvideEvents())
                         {
                             string name = "Events from Scene/" + (provider as MonoBehaviour).name + "/" + evt.Name;
-                            menu.AddItem(new GUIContent(name), false, (t) => {
+                            menu.AddItem(new GUIContent(name), false, (t) =>
+                            {
                                 eventsList.arraySize++;
 
-                                VRC_EventHandler.VrcEvent e = (VRC_EventHandler.VrcEvent)t;
+                                VRCSDK2.VRC_EventHandler.VrcEvent e = (VRCSDK2.VRC_EventHandler.VrcEvent)t;
 
                                 SerializedProperty newEventProperty = eventsList.GetArrayElementAtIndex(eventsList.arraySize - 1);
                                 newEventProperty.FindPropertyRelative("Name").stringValue = e.Name;
@@ -591,22 +607,22 @@ namespace VRCSDK2
 
         private void RenderDataStorage(SerializedProperty triggerProperty)
         {
-            if (triggerProperty.serializedObject.targetObjects.Any(obj => (obj as VRC_Trigger).gameObject.GetComponent<VRC_DataStorage>() == null))
+            if (triggerProperty.serializedObject.targetObjects.Any(obj => (obj as VRCSDK2.VRC_Trigger).gameObject.GetComponent<VRCSDK2.VRC_DataStorage>() == null))
                 RenderHelpBox("Data Storage Triggers require a VRC_DataStorage Component.", MessageType.Warning);
             else
             {
                 SerializedProperty idxProperty = triggerProperty.FindPropertyRelative("DataElementIdx");
-                VRC_DataStorage ds = (target as VRC_Trigger).gameObject.GetComponent<VRC_DataStorage>();
+                VRCSDK2.VRC_DataStorage ds = (target as VRCSDK2.VRC_Trigger).gameObject.GetComponent<VRCSDK2.VRC_DataStorage>();
 
                 if (ds.data == null)
                 {
-                    ds.data = new VRC_DataStorage.VrcDataElement[0];
+                    ds.data = new VRCSDK2.VRC_DataStorage.VrcDataElement[0];
                     idxProperty.intValue = -1;
                 }
 
                 List<string> names = new List<string>();
                 names.Add("Any Data Element");
-                foreach (VRC_DataStorage.VrcDataElement element in ds.data)
+                foreach (VRCSDK2.VRC_DataStorage.VrcDataElement element in ds.data)
                     names.Add(element.name);
 
                 int selectedIdx = idxProperty.intValue;
@@ -694,7 +710,7 @@ namespace VRCSDK2
             if (objectLists[idx] == null)
             {
                 objectLists[idx] = new ReorderableList(objectsProperty.serializedObject, objectsProperty, true, true, true, true);
-                objectLists[idx].drawHeaderCallback = (Rect rect) => 
+                objectLists[idx].drawHeaderCallback = (Rect rect) =>
                 {
                     string infoString = "Receivers";
                     if (objectsProperty.arraySize == 0)
@@ -809,7 +825,7 @@ namespace VRCSDK2
             }
             parameterObjectProperty.objectReferenceValue = null;
 
-            switch ((VRC_EventHandler.VrcEventType)eventTypeProperty.intValue)
+            switch ((VRCSDK2.VRC_EventHandler.VrcEventType)eventTypeProperty.intValue)
             {
                 case VRCSDK2.VRC_EventHandler.VrcEventType.AnimationBool:
                     {
@@ -946,6 +962,7 @@ namespace VRCSDK2
                     {
                         RenderTargetGameObjectList(parameterObjectsProperty, triggerIdx);
                         RenderPropertyEditor(shadowProperty, parameterBoolOpProperty, new GUIContent("Align Room To Destination"), true);
+                        parameterIntProperty.intValue = EditorGUILayout.Toggle("Lerp On Remote Clients", (parameterIntProperty.intValue != 0)) ? 1 : 0;
                         break;
                     }
                 case VRCSDK2.VRC_EventHandler.VrcEventType.SetWebPanelURI:
@@ -971,16 +988,16 @@ namespace VRCSDK2
                         }
                     }
                     break;
-                case VRC_EventHandler.VrcEventType.ActivateCustomTrigger:
+                case VRCSDK2.VRC_EventHandler.VrcEventType.ActivateCustomTrigger:
                     {
-                        RenderTargetComponentList<VRC_Trigger>(parameterObjectsProperty, triggerIdx);
+                        RenderTargetComponentList<VRCSDK2.VRC_Trigger>(parameterObjectsProperty, triggerIdx);
 
                         VRC_EditorTools.CustomTriggerPopup("Name", parameterObjectsProperty, parameterStringProperty);
                     }
                     break;
-                case VRC_EventHandler.VrcEventType.SpawnObject:
+                case VRCSDK2.VRC_EventHandler.VrcEventType.SpawnObject:
                     {
-                        VRC_SceneDescriptor scene = FindObjectOfType<VRC_SceneDescriptor>();
+                        VRCSDK2.VRC_SceneDescriptor scene = FindObjectOfType<VRCSDK2.VRC_SceneDescriptor>();
 
                         string path = parameterStringProperty.stringValue;
                         GameObject found = scene != null ? scene.DynamicPrefabs.FirstOrDefault(p => AssetDatabase.GetAssetOrScenePath(p) == path) : null;
@@ -991,27 +1008,27 @@ namespace VRCSDK2
                         RenderTargetComponentList<Transform>(parameterObjectsProperty, triggerIdx, "Locations");
                     }
                     break;
-                case VRC_EventHandler.VrcEventType.DestroyObject:
+                case VRCSDK2.VRC_EventHandler.VrcEventType.DestroyObject:
                     {
                         SerializedProperty broadcastTypeProperty = triggerProperty.FindPropertyRelative("BroadcastType");
-                        VRC_EventHandler.VrcBroadcastType broadcast = (VRC_EventHandler.VrcBroadcastType)broadcastTypeProperty.intValue;
-                        if (broadcast != VRC_EventHandler.VrcBroadcastType.Always && broadcast != VRC_EventHandler.VrcBroadcastType.AlwaysUnbuffered && broadcast != VRC_EventHandler.VrcBroadcastType.AlwaysBufferOne)
+                        VRCSDK2.VRC_EventHandler.VrcBroadcastType broadcast = (VRCSDK2.VRC_EventHandler.VrcBroadcastType)broadcastTypeProperty.intValue;
+                        if (broadcast != VRCSDK2.VRC_EventHandler.VrcBroadcastType.Always && broadcast != VRCSDK2.VRC_EventHandler.VrcBroadcastType.AlwaysUnbuffered && broadcast != VRCSDK2.VRC_EventHandler.VrcBroadcastType.AlwaysBufferOne)
                             RenderHelpBox("Not all clients will destroy the object.", MessageType.Warning);
 
                         RenderTargetGameObjectList(parameterObjectsProperty, triggerIdx);
                     }
                     break;
-                case VRC_EventHandler.VrcEventType.SetLayer:
+                case VRCSDK2.VRC_EventHandler.VrcEventType.SetLayer:
                     {
                         RenderTargetGameObjectList(parameterObjectsProperty, triggerIdx);
                         parameterIntProperty.intValue = (int)EditorGUILayout.LayerField("Layer", parameterIntProperty.intValue);
                     }
                     break;
-                case VRC_EventHandler.VrcEventType.SetMaterial:
+                case VRCSDK2.VRC_EventHandler.VrcEventType.SetMaterial:
                     {
                         RenderTargetGameObjectList(parameterObjectsProperty, triggerIdx);
 
-                        VRC_SceneDescriptor scene = FindObjectOfType<VRC_SceneDescriptor>();
+                        VRCSDK2.VRC_SceneDescriptor scene = FindObjectOfType<VRCSDK2.VRC_SceneDescriptor>();
 
                         string path = parameterStringProperty.stringValue;
                         Material found = scene != null ? scene.DynamicMaterials.FirstOrDefault(p => AssetDatabase.GetAssetOrScenePath(p) == path) : null;
@@ -1026,57 +1043,58 @@ namespace VRCSDK2
                         }
                     }
                     break;
-                case VRC_EventHandler.VrcEventType.AddDamage:
+                case VRCSDK2.VRC_EventHandler.VrcEventType.AddDamage:
                     {
                         RenderTargetGameObjectList(parameterObjectsProperty, triggerIdx, false);
                         RenderPropertyEditor(shadowProperty, parameterFloatProperty, new GUIContent("Damage"));
                     }
                     break;
-                case VRC_EventHandler.VrcEventType.AddHealth:
+                case VRCSDK2.VRC_EventHandler.VrcEventType.AddHealth:
                     {
                         RenderTargetGameObjectList(parameterObjectsProperty, triggerIdx, false);
                         RenderPropertyEditor(shadowProperty, parameterFloatProperty, new GUIContent("Health"));
                     }
                     break;
-                case VRC_EventHandler.VrcEventType.SetComponentActive:
+                case VRCSDK2.VRC_EventHandler.VrcEventType.SetComponentActive:
                     {
                         RenderTargetGameObjectList(parameterObjectsProperty, triggerIdx);
                         if (RenderTargetComponentEditor(parameterStringProperty, parameterObjectsProperty, triggerIdx))
                             RenderPropertyEditor(shadowProperty, parameterBoolOpProperty, new GUIContent("Enable"), true);
                     }
                     break;
-                case VRC_EventHandler.VrcEventType.AddVelocity:
-                case VRC_EventHandler.VrcEventType.SetVelocity:
+                case VRCSDK2.VRC_EventHandler.VrcEventType.AddVelocity:
+                case VRCSDK2.VRC_EventHandler.VrcEventType.SetVelocity:
                     {
                         RenderTargetComponentList<Rigidbody>(parameterObjectsProperty, triggerIdx);
                         RenderVector3andSpacePropertyEditor(parameterBytesProperty, new GUIContent("Velocity"));
                     }
                     break;
-                case VRC_EventHandler.VrcEventType.AddAngularVelocity:
-                case VRC_EventHandler.VrcEventType.SetAngularVelocity:
+                case VRCSDK2.VRC_EventHandler.VrcEventType.AddAngularVelocity:
+                case VRCSDK2.VRC_EventHandler.VrcEventType.SetAngularVelocity:
                     {
                         RenderTargetComponentList<Rigidbody>(parameterObjectsProperty, triggerIdx);
                         RenderVector3andSpacePropertyEditor(parameterBytesProperty, new GUIContent("Angular Velocity"));
                     }
                     break;
-                case VRC_EventHandler.VrcEventType.AddForce:
+                case VRCSDK2.VRC_EventHandler.VrcEventType.AddForce:
                     {
                         RenderTargetComponentList<Rigidbody>(parameterObjectsProperty, triggerIdx);
                         RenderVector3andSpacePropertyEditor(parameterBytesProperty, new GUIContent("Force"));
                     }
                     break;
-                case VRC_EventHandler.VrcEventType.SetUIText:
+                case VRCSDK2.VRC_EventHandler.VrcEventType.SetUIText:
                     {
                         RenderTargetComponentList<Text>(parameterObjectsProperty, triggerIdx);
                         RenderPropertyEditor(shadowProperty, parameterStringProperty, new GUIContent("Text"));
                     }
                     break;
+
 #if UDON
-                case VRC_EventHandler.VrcEventType.CallUdonMethod:
-                    {
-                        RenderTargetComponentList<VRC.Udon.UdonBehaviour>(parameterObjectsProperty, triggerIdx);
-                        RenderPropertyEditor(shadowProperty, parameterStringProperty, new GUIContent("Method Name"));
-                    }
+                case VRCSDK2.VRC_EventHandler.VrcEventType.CallUdonMethod:
+                    //{
+                    //    RenderTargetComponentList<VRC.Udon.UdonBehaviour>(parameterObjectsProperty, triggerIdx);
+                    //    RenderPropertyEditor(shadowProperty, parameterStringProperty, new GUIContent("Method Name"));
+                    //}
                     break;
 #endif
                 default:
@@ -1088,24 +1106,24 @@ namespace VRCSDK2
         private void RenderVector3andSpacePropertyEditor(SerializedProperty propertyBytes, GUIContent label)
         {
             object[] parameters = null;
-            parameters = VRCSDK2.VRC_Serialization.ParameterDecoder(VRC_EditorTools.ReadBytesFromProperty(propertyBytes));
+            parameters = VRC.SDKBase.VRC_Serialization.ParameterDecoder(VRC_EditorTools.ReadBytesFromProperty(propertyBytes));
             if (parameters.Length == 0)
                 parameters = new object[1] { new Vector4() };
 
             EditorGUI.BeginChangeCheck();
-            Vector3 vec3Field = EditorGUILayout.Vector3Field(label,new Vector3(((Vector4)parameters[0]).x, ((Vector4)parameters[0]).y, ((Vector4)parameters[0]).z));
+            Vector3 vec3Field = EditorGUILayout.Vector3Field(label, new Vector3(((Vector4)parameters[0]).x, ((Vector4)parameters[0]).y, ((Vector4)parameters[0]).z));
             bool spaceField = EditorGUILayout.Toggle("Use World Space", ((Vector4)parameters[0]).w > .5f ? true : false);
             parameters[0] = new Vector4(vec3Field.x, vec3Field.y, vec3Field.z, Convert.ToSingle(spaceField));
             if (EditorGUI.EndChangeCheck())
             {
-                VRC_EditorTools.WriteBytesToProperty(propertyBytes, VRCSDK2.VRC_Serialization.ParameterEncoder(parameters));
+                VRC_EditorTools.WriteBytesToProperty(propertyBytes, VRC.SDKBase.VRC_Serialization.ParameterEncoder(parameters));
             }
         }
 
         private void RenderVector3PropertyEditor(SerializedProperty propertyBytes, GUIContent label)
         {
             object[] parameters = null;
-            parameters = VRCSDK2.VRC_Serialization.ParameterDecoder(VRC_EditorTools.ReadBytesFromProperty(propertyBytes));
+            parameters = VRC.SDKBase.VRC_Serialization.ParameterDecoder(VRC_EditorTools.ReadBytesFromProperty(propertyBytes));
             if (parameters.Length == 0)
                 parameters = new object[1] { new Vector3() };
 
@@ -1114,7 +1132,7 @@ namespace VRCSDK2
 
             if (EditorGUI.EndChangeCheck())
             {
-                VRC_EditorTools.WriteBytesToProperty(propertyBytes, VRCSDK2.VRC_Serialization.ParameterEncoder(parameters));
+                VRC_EditorTools.WriteBytesToProperty(propertyBytes, VRC.SDKBase.VRC_Serialization.ParameterEncoder(parameters));
             }
         }
 
@@ -1184,44 +1202,41 @@ namespace VRCSDK2
             if (parameterIntProperty.intValue == -1)
                 parameterIntProperty.intValue = (int)(VRCSDK2.VRC_EventHandler.VrcTargetType.All);
 
-            if (advancedProperty.boolValue)
-            {
-                parameterIntProperty.intValue = (int)VRC_EditorTools.FilteredEnumPopup<VRCSDK2.VRC_EventHandler.VrcTargetType>("Targets", (VRCSDK2.VRC_EventHandler.VrcTargetType)parameterIntProperty.intValue, e => e != VRC_EventHandler.VrcTargetType.TargetPlayer);
+            parameterIntProperty.intValue = (int)VRC_EditorTools.FilteredEnumPopup<VRCSDK2.VRC_EventHandler.VrcTargetType>("Targets", (VRCSDK2.VRC_EventHandler.VrcTargetType)parameterIntProperty.intValue, e => e != VRCSDK2.VRC_EventHandler.VrcTargetType.TargetPlayer);
 
-                string message = null;
-                switch ((VRCSDK2.VRC_EventHandler.VrcTargetType)parameterIntProperty.intValue)
-                {
-                    case VRC_EventHandler.VrcTargetType.All:
-                        message = "Will execute on all clients, except for those that join later.";
-                        break;
-                    case VRC_EventHandler.VrcTargetType.AllBuffered:
-                        message = "Will execute on all clients, including those that join later.";
-                        break;
-                    case VRC_EventHandler.VrcTargetType.Local:
-                        message = "Will execute for the instigator only.";
-                        break;
-                    case VRC_EventHandler.VrcTargetType.Master:
-                        message = "Will execute on the Master.";
-                        break;
-                    case VRC_EventHandler.VrcTargetType.Others:
-                        message = "Will execute for others but not locally, except for those that join later.";
-                        break;
-                    case VRC_EventHandler.VrcTargetType.OthersBuffered:
-                        message = "Will execute for others but not locally, including those that join later.";
-                        break;
-                    case VRC_EventHandler.VrcTargetType.Owner:
-                        message = "Will execute on the Owner.";
-                        break;
-                    case VRC_EventHandler.VrcTargetType.AllBufferOne:
-                        message = "Will execute on all clients, and only the most recent is executed for those that join later.";
-                        break;
-                    case VRC_EventHandler.VrcTargetType.OthersBufferOne:
-                        message = "Will execute for others but not locally, and only the most recent is executed for those that join later.";
-                        break;
-                }
-                if (message != null)
-                    RenderHelpBox(message, MessageType.Info);
+            string message = null;
+            switch ((VRCSDK2.VRC_EventHandler.VrcTargetType)parameterIntProperty.intValue)
+            {
+                case VRCSDK2.VRC_EventHandler.VrcTargetType.All:
+                    message = "Will execute on all clients, except for those that join later.";
+                    break;
+                case VRCSDK2.VRC_EventHandler.VrcTargetType.AllBuffered:
+                    message = "Will execute on all clients, including those that join later.";
+                    break;
+                case VRCSDK2.VRC_EventHandler.VrcTargetType.Local:
+                    message = "Will execute for the instigator only.";
+                    break;
+                case VRCSDK2.VRC_EventHandler.VrcTargetType.Master:
+                    message = "Will execute on the Master.";
+                    break;
+                case VRCSDK2.VRC_EventHandler.VrcTargetType.Others:
+                    message = "Will execute for others but not locally, except for those that join later.";
+                    break;
+                case VRCSDK2.VRC_EventHandler.VrcTargetType.OthersBuffered:
+                    message = "Will execute for others but not locally, including those that join later.";
+                    break;
+                case VRCSDK2.VRC_EventHandler.VrcTargetType.Owner:
+                    message = "Will execute on the Owner.";
+                    break;
+                case VRCSDK2.VRC_EventHandler.VrcTargetType.AllBufferOne:
+                    message = "Will execute on all clients, and only the most recent is executed for those that join later.";
+                    break;
+                case VRCSDK2.VRC_EventHandler.VrcTargetType.OthersBufferOne:
+                    message = "Will execute for others but not locally, and only the most recent is executed for those that join later.";
+                    break;
             }
+            if (message != null)
+                RenderHelpBox(message, MessageType.Info);
 
             Dictionary<string, List<MethodInfo>> methods = VRC_EditorTools.GetSharedAccessibleMethodsOnGameObjects(parameterObjectsProperty);
             if (methods.Count == 0)
@@ -1238,12 +1253,17 @@ namespace VRCSDK2
 
             ParameterInfo[] paramInfo = info.GetParameters();
 
+            // Editor-only
+            foreach (var p in paramInfo)
+                if (p.ParameterType.Namespace.StartsWith("VRCSDK2"))
+                    VRC.SDKBase.VRC_Serialization.RegisterType(p.ParameterType);
+
             object[] parameters = null;
             if (rpcByteCache.ContainsKey(eventProperty.propertyPath))
                 parameters = rpcByteCache[eventProperty.propertyPath];
             else
             {
-                parameters = VRCSDK2.VRC_Serialization.ParameterDecoder(VRC_EditorTools.ReadBytesFromProperty(parameterBytesProperty));
+                parameters = VRC.SDKBase.VRC_Serialization.ParameterDecoder(VRC_EditorTools.ReadBytesFromProperty(parameterBytesProperty));
                 rpcByteCache.Add(eventProperty.propertyPath, parameters);
             }
 
@@ -1252,9 +1272,9 @@ namespace VRCSDK2
             if (parameters.Length != paramInfo.Length)
                 Array.Resize(ref parameters, paramInfo.Length);
 
-            bool finalIntAsPlayerID = false;
-
             EditorGUI.BeginChangeCheck();
+
+            bool finalParamIsPlayer = false;
 
             for (int idx = 0; idx < parameters.Length; ++idx)
             {
@@ -1276,14 +1296,14 @@ namespace VRCSDK2
                     // make an array of strings of the enum values
                     var values = Enum.GetValues(paramType);
                     string[] itemStrings = new string[values.Length];
-                    int i=0;
+                    int i = 0;
                     foreach (var item in Enum.GetValues(paramType))
                     {
                         itemStrings[i++] = item.ToString();
-                    } 
+                    }
                     if (parameters[idx] == null || parameters[idx].GetType() != paramType)
                         parameters[idx] = Enum.Parse(paramType, itemStrings[0]);
-                    parameters[idx] = Enum.Parse( paramType, itemStrings[ EditorGUILayout.Popup(paramInfo[idx].Name, (int)parameters[idx], itemStrings) ] );
+                    parameters[idx] = Enum.Parse(paramType, itemStrings[EditorGUILayout.Popup(paramInfo[idx].Name, (int)parameters[idx], itemStrings)]);
                 }
                 else if (paramType == typeof(double))
                 {
@@ -1299,14 +1319,15 @@ namespace VRCSDK2
                 }
                 else if (paramType == typeof(int))
                 {
+                    if (parameters[idx] == null || parameters[idx].GetType() != paramType)
+                        parameters[idx] = 0;
+                    parameters[idx] = EditorGUILayout.IntField(paramInfo[idx].Name, (int)parameters[idx]);
+                }
+                else if (typeof(VRC.SDKBase.VRCPlayerApi).IsAssignableFrom(paramType))
+                {
                     if (idx == parameters.Length - 1)
-                        finalIntAsPlayerID = !advancedProperty.boolValue || EditorGUILayout.Toggle("Use Player ID as last", finalIntAsPlayerID || parameters[idx] == null);
-                    if (!finalIntAsPlayerID)
-                    {
-                        if (parameters[idx] == null || parameters[idx].GetType() != paramType)
-                            parameters[idx] = 0;
-                        parameters[idx] = EditorGUILayout.IntField(paramInfo[idx].Name, (int)parameters[idx]);
-                    }
+                        finalParamIsPlayer = true;
+                    parameters[idx] = null;
                 }
                 else if (paramType == typeof(long))
                 {
@@ -1360,12 +1381,12 @@ namespace VRCSDK2
                     EditorGUILayout.LabelField("Unable to handle " + paramType.Name, EditorStyles.boldLabel);
             }
 
-            if (finalIntAsPlayerID)
+            if (finalParamIsPlayer)
                 Array.Resize(ref parameters, parameters.Length - 1);
 
             if (EditorGUI.EndChangeCheck())
             {
-                VRC_EditorTools.WriteBytesToProperty(parameterBytesProperty, VRCSDK2.VRC_Serialization.ParameterEncoder(parameters));
+                VRC_EditorTools.WriteBytesToProperty(parameterBytesProperty, VRC.SDKBase.VRC_Serialization.ParameterEncoder(parameters));
                 rpcByteCache[eventProperty.propertyPath] = parameters;
             }
         }
@@ -1415,7 +1436,7 @@ namespace VRCSDK2
 
         private void RenderPropertyEditor(SerializedProperty shadowProperty, SerializedProperty property, GUIContent label, bool isBoolOp = false)
         {
-            VRC_DataStorage ds = (target as VRC_Trigger).gameObject.GetComponent<VRC_DataStorage>();
+            VRCSDK2.VRC_DataStorage ds = (target as VRCSDK2.VRC_Trigger).gameObject.GetComponent<VRCSDK2.VRC_DataStorage>();
             if (ds != null && ds.data != null && ds.data.Length != 0 && shadowProperty != null)
             {
                 EditorGUILayout.BeginHorizontal();
@@ -1427,28 +1448,28 @@ namespace VRCSDK2
                     case SerializedPropertyType.Boolean:
                         {
                             SerializedProperty prop = shadowProperty.FindPropertyRelative("ParameterBoolOp");
-                            List<string> vals = ds.data.Where(el => el.type == VRC_DataStorage.VrcDataType.Bool).Select(el => el.name).ToList();
+                            List<string> vals = ds.data.Where(el => el.type == VRCSDK2.VRC_DataStorage.VrcDataType.Bool).Select(el => el.name).ToList();
                             renderField = !ListPopup(vals, prop);
                         }
                         break;
                     case SerializedPropertyType.Float:
                         {
                             SerializedProperty prop = shadowProperty.FindPropertyRelative("ParameterFloat");
-                            List<string> vals = ds.data.Where(el => el.type == VRC_DataStorage.VrcDataType.Float).Select(el => el.name).ToList();
+                            List<string> vals = ds.data.Where(el => el.type == VRCSDK2.VRC_DataStorage.VrcDataType.Float).Select(el => el.name).ToList();
                             renderField = !ListPopup(vals, prop);
                         }
                         break;
                     case SerializedPropertyType.Integer:
                         {
                             SerializedProperty prop = shadowProperty.FindPropertyRelative("ParameterInt");
-                            List<string> vals = ds.data.Where(el => el.type == VRC_DataStorage.VrcDataType.Int).Select(el => el.name).ToList();
+                            List<string> vals = ds.data.Where(el => el.type == VRCSDK2.VRC_DataStorage.VrcDataType.Int).Select(el => el.name).ToList();
                             renderField = !ListPopup(vals, prop);
                         }
                         break;
                     case SerializedPropertyType.String:
                         {
                             SerializedProperty prop = shadowProperty.FindPropertyRelative("ParameterString");
-                            List<string> vals = ds.data.Where(el => el.type == VRC_DataStorage.VrcDataType.String).Select(el => el.name).ToList();
+                            List<string> vals = ds.data.Where(el => el.type == VRCSDK2.VRC_DataStorage.VrcDataType.String).Select(el => el.name).ToList();
                             renderField = !ListPopup(vals, prop);
                         }
                         break;
@@ -1466,7 +1487,7 @@ namespace VRCSDK2
             else
             {
                 if (isBoolOp)
-                    VRC_EditorTools.FilteredEnumPopup<VRCSDK2.VRC_EventHandler.VrcBooleanOp>(label.text, property, s => s != VRC_EventHandler.VrcBooleanOp.Unused);
+                    VRC_EditorTools.FilteredEnumPopup<VRCSDK2.VRC_EventHandler.VrcBooleanOp>(label.text, property, s => s != VRCSDK2.VRC_EventHandler.VrcBooleanOp.Unused);
                 else
                     EditorGUILayout.PropertyField(property, label);
                 return;
@@ -1499,4 +1520,5 @@ namespace VRCSDK2
         }
     }
 }
+#endif
 #endif

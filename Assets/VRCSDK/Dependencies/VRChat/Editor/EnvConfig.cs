@@ -4,7 +4,9 @@ using UnityEngine;
 using UnityEditor;
 using System.Collections;
 using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using UnityEngine.Rendering;
 using VRCSDK2.Validation.Performance.Stats;
 
@@ -41,9 +43,9 @@ public class EnvConfig
         { BuildTarget.StandaloneOSX, null }
     };
 
+#if ENV_SET_INCLUDED_SHADERS && VRC_CLIENT
     static string[] ensureTheseShadersAreAvailable = new string[]
     {
-#if VRC_CLIENT
         "Hidden/CubeBlend",
         "Hidden/CubeBlur",
         "Hidden/CubeCopy",
@@ -121,6 +123,7 @@ public class EnvConfig
         "Toon/Lit Cutout (Double)",
         "Toon/Lit Outline",
         "VRChat/Mobile/Diffuse",
+        "Video/RealtimeEmissiveGamma",
         "VRChat/Mobile/Bumped Uniform Diffuse",
         "VRChat/Mobile/Bumped Uniform Specular",
         "VRChat/Mobile/Toon Lit",
@@ -136,8 +139,8 @@ public class EnvConfig
         "Unlit/Transparent Cutout",
         "Unlit/Texture",
         "MatCap/Vertex/Textured Lit",
-#endif
     };
+#endif
 
     private static bool _requestConfigureSettings = true;
 
@@ -170,9 +173,14 @@ public class EnvConfig
 
     public static bool ConfigureSettings()
     {
-        CustomDLLMaker.CreateDirectories();
         if (CheckForFirstInit())
+        {
+#if VRC_SDK_VRCSDK2
             VRC.AssetExporter.CleanupTmpFiles();
+#elif VRC_SDK_VRCSDK3
+                VRC.SDK3.Editor.AssetExporter.CleanupTmpFiles();
+#endif
+        }
 
         if (EditorApplication.isPlayingOrWillChangePlaymode || EditorApplication.isUpdating)
             return false;
@@ -260,14 +268,14 @@ public class EnvConfig
     [MenuItem("VRChat SDK/Utilities/Force Configure Player Settings")]
     public static void ConfigurePlayerSettings()
     {
-        Debug.Log("Setting required PlayerSettings...");
+        VRC.Core.Logger.Log("Setting required PlayerSettings...", VRC.Core.DebugLevel.All);
 
         SetBuildTarget();
 
         // Needed for Microsoft.CSharp namespace in DLLMaker
         // Doesn't seem to work though
-        if (PlayerSettings.GetApiCompatibilityLevel(EditorUserBuildSettings.selectedBuildTargetGroup) != ApiCompatibilityLevel.NET_2_0)
-            PlayerSettings.SetApiCompatibilityLevel(EditorUserBuildSettings.selectedBuildTargetGroup, ApiCompatibilityLevel.NET_2_0);
+        if (PlayerSettings.GetApiCompatibilityLevel(EditorUserBuildSettings.selectedBuildTargetGroup) != ApiCompatibilityLevel.NET_4_6)
+            PlayerSettings.SetApiCompatibilityLevel(EditorUserBuildSettings.selectedBuildTargetGroup, ApiCompatibilityLevel.NET_4_6);
 
         if (!PlayerSettings.runInBackground)
             PlayerSettings.runInBackground = true;
@@ -283,6 +291,8 @@ public class EnvConfig
         SetPlayerSettings();
 
 #if VRC_CLIENT
+        PlatformSwitcher.RefreshRequiredPackages(EditorUserBuildSettings.selectedBuildTargetGroup);
+
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
 #else
@@ -294,18 +304,33 @@ public class EnvConfig
         VRC.Core.AnalyticsSDK.Initialize(VRC.Core.SDKClientUtilities.GetSDKVersionDate());
 #endif
 
+        #if VRC_CLIENT
         // VRCLog should handle disk writing
         PlayerSettings.usePlayerLog = false;
-        if (EditorUserBuildSettings.selectedBuildTargetGroup != BuildTargetGroup.Standalone)
+        foreach (LogType logType in Enum.GetValues(typeof(LogType)).Cast<LogType>())
         {
-            foreach (var logType in Enum.GetValues(typeof(LogType)).Cast<LogType>())
-                PlayerSettings.SetStackTraceLogType(logType, StackTraceLogType.None);
+            switch(logType)
+            {
+                case LogType.Assert:
+                case LogType.Exception:
+                {
+                    PlayerSettings.SetStackTraceLogType(logType, StackTraceLogType.ScriptOnly);
+                    break;
+                }
+                case LogType.Error:
+                case LogType.Warning:
+                case LogType.Log:
+                {
+                    PlayerSettings.SetStackTraceLogType(logType, StackTraceLogType.None);
+                    break;
+                }
+                default:
+                {
+                    throw new ArgumentOutOfRangeException();
+                }
+            }
         }
-        else
-        {
-            foreach (var logType in Enum.GetValues(typeof(LogType)).Cast<LogType>())
-                PlayerSettings.SetStackTraceLogType(logType, StackTraceLogType.ScriptOnly);
-        }
+        #endif
     }
 
     static void EnableBatching(bool enable)
@@ -358,82 +383,14 @@ public class EnvConfig
 
     public static void SetVRSDKs(BuildTargetGroup buildTargetGroup, string[] sdkNames)
     {
-        Debug.Log("Setting virtual reality SDKs in PlayerSettings: ");
+        VRC.Core.Logger.Log("Setting virtual reality SDKs in PlayerSettings: ", VRC.Core.DebugLevel.All);
         if (sdkNames != null)
         {
             foreach (string s in sdkNames)
-                Debug.Log("- " + s);
+                VRC.Core.Logger.Log("- " + s, VRC.Core.DebugLevel.All);
         }
 
-        PlayerSettings[] playerSettings = Resources.FindObjectsOfTypeAll<PlayerSettings>();
-        if (playerSettings == null)
-            return;
-
-        SerializedObject playerSettingsSerializedObject = new SerializedObject(playerSettings);
-        SerializedProperty settingsGroup = playerSettingsSerializedObject.FindProperty("m_BuildTargetVRSettings");
-        if (settingsGroup == null)
-            return;
-
-        for (int i = 0; i < settingsGroup.arraySize; i++)
-        {
-            SerializedProperty settingVal = settingsGroup.GetArrayElementAtIndex(i);
-            if (settingVal == null)
-                continue;
-
-            IEnumerator enumerator = settingVal.GetEnumerator();
-            if (enumerator == null)
-                continue;
-
-            while (enumerator.MoveNext())
-            {
-                SerializedProperty property = (SerializedProperty)enumerator.Current;
-
-
-				if (property != null && property.name == "m_BuildTarget")
-				{
-					if (property.stringValue != buildTargetGroup.ToString())
-						break;
-				}
-
-                if (property != null && property.name == "m_Devices")
-                {
-                    bool overwrite = true;
-                    if (property.arraySize == sdkNames.Length)
-                    {
-                        overwrite = false;
-                        for (int e = 0; e < sdkNames.Length; ++e)
-                        {
-                            if (property.GetArrayElementAtIndex(e).stringValue != sdkNames[e])
-                                overwrite = true;
-                        }
-                    }
-                    if (overwrite)
-                    {
-                        property.ClearArray();
-                        property.arraySize = (sdkNames != null) ? sdkNames.Length : 0;
-                        for (int j = 0; j < property.arraySize; j++)
-                        {
-                            property.GetArrayElementAtIndex(j).stringValue = sdkNames[j];
-                        }
-                    }
-                }
-            }
-        }
-
-        playerSettingsSerializedObject.ApplyModifiedProperties();
-    }
-
-    static void RefreshClientVRSDKs()
-    {
-#if VRC_CLIENT
-
-#if VRC_VR_STEAM
-        SetVRSDKs( BuildTargetGroup.Standalone, new string[] { "None", "OpenVR", "Oculus" });
-#else
-		SetVRSDKs(BuildTargetGroup.Standalone, new string[] { "None", "Oculus", "OpenVR" });
-#endif
-
-#endif // VRC_CLIENT
+        PlayerSettings.SetVirtualRealitySDKs(buildTargetGroup, sdkNames);
     }
 
     public static bool CheckForFirstInit()
@@ -447,7 +404,7 @@ public class EnvConfig
 
     static void SetDefaultGraphicsAPIs()
     {
-        Debug.Log("Setting Graphics APIs");
+        VRC.Core.Logger.Log("Setting Graphics APIs", VRC.Core.DebugLevel.All);
         foreach (BuildTarget target in relevantBuildTargets)
         {
             var apis = allowedGraphicsAPIs[target];
@@ -479,7 +436,7 @@ public class EnvConfig
 
     static void SetGraphicsSettings()
     {
-        Debug.Log("Setting Graphics Settings");
+        VRC.Core.Logger.Log("Setting Graphics Settings", VRC.Core.DebugLevel.All);
 
         const string GraphicsSettingsAssetPath = "ProjectSettings/GraphicsSettings.asset";
         SerializedObject graphicsManager = new SerializedObject(UnityEditor.AssetDatabase.LoadAllAssetsAtPath(GraphicsSettingsAssetPath)[0]);
@@ -524,7 +481,7 @@ public class EnvConfig
         System.Collections.Generic.List<Shader> foundShaders = new System.Collections.Generic.List<Shader>();
 #endif
 
-        for (int shaderIdx = 0; shaderIdx < ensureTheseShadersAreAvailable.Length; ++shaderIdx) 
+        for (int shaderIdx = 0; shaderIdx < ensureTheseShadersAreAvailable.Length; ++shaderIdx)
         {
             if (foundShaders.Any(s => s.name == ensureTheseShadersAreAvailable[shaderIdx]))
                 continue;
@@ -594,20 +551,6 @@ public class EnvConfig
         lightmapKeepSubtractive.boolValue = true;
 #endif
 
-#if ENV_SET_FOG
-        SerializedProperty fogStripping = graphicsManager.FindProperty("m_FogStripping");
-        fogStripping.enumValueIndex = 1;
-
-        SerializedProperty fogKeepLinear = graphicsManager.FindProperty("m_FogKeepLinear");
-        fogKeepLinear.boolValue = true;
-
-        SerializedProperty fogKeepExp = graphicsManager.FindProperty("m_FogKeepExp");
-        fogKeepExp.boolValue = true;
-
-        SerializedProperty fogKeepExp2 = graphicsManager.FindProperty("m_FogKeepExp2");
-        fogKeepExp2.boolValue = true;
-#endif
-
         SerializedProperty albedoSwatchInfos = graphicsManager.FindProperty("m_AlbedoSwatchInfos");
         albedoSwatchInfos.ClearArray();
         albedoSwatchInfos.arraySize = 0;
@@ -620,7 +563,53 @@ public class EnvConfig
 
         graphicsManager.ApplyModifiedProperties();
     }
+
+    public static FogSettings GetFogSettings()
+    {
+        VRC.Core.Logger.Log("Force-enabling Fog", VRC.Core.DebugLevel.All);
+
+        const string graphicsSettingsAssetPath = "ProjectSettings/GraphicsSettings.asset";
+        SerializedObject graphicsManager = new SerializedObject(AssetDatabase.LoadAllAssetsAtPath(graphicsSettingsAssetPath)[0]);
+
+
+        SerializedProperty fogStrippingSerializedProperty = graphicsManager.FindProperty("m_FogStripping");
+        FogSettings.FogStrippingMode fogStripping = (FogSettings.FogStrippingMode)fogStrippingSerializedProperty.enumValueIndex;
+
+        SerializedProperty fogKeepLinearSerializedProperty = graphicsManager.FindProperty("m_FogKeepLinear");
+        bool keepLinear = fogKeepLinearSerializedProperty.boolValue;
+
+        SerializedProperty fogKeepExpSerializedProperty = graphicsManager.FindProperty("m_FogKeepExp");
+        bool keepExp = fogKeepExpSerializedProperty.boolValue;
+
+        SerializedProperty fogKeepExp2SerializedProperty = graphicsManager.FindProperty("m_FogKeepExp2");
+        bool keepExp2 = fogKeepExp2SerializedProperty.boolValue;
+
+        FogSettings fogSettings = new FogSettings(fogStripping, keepLinear, keepExp, keepExp2);
+        return fogSettings;
+    }
     
+    public static void SetFogSettings(FogSettings fogSettings)
+    {
+        VRC.Core.Logger.Log("Force-enabling Fog", VRC.Core.DebugLevel.All);
+
+        const string graphicsSettingsAssetPath = "ProjectSettings/GraphicsSettings.asset";
+        SerializedObject graphicsManager = new SerializedObject(AssetDatabase.LoadAllAssetsAtPath(graphicsSettingsAssetPath)[0]);
+
+        SerializedProperty fogStripping = graphicsManager.FindProperty("m_FogStripping");
+        fogStripping.enumValueIndex = (int)fogSettings.fogStrippingMode;
+
+        SerializedProperty fogKeepLinear = graphicsManager.FindProperty("m_FogKeepLinear");
+        fogKeepLinear.boolValue = fogSettings.keepLinear;
+
+        SerializedProperty fogKeepExp = graphicsManager.FindProperty("m_FogKeepExp");
+        fogKeepExp.boolValue = fogSettings.keepExp;
+
+        SerializedProperty fogKeepExp2 = graphicsManager.FindProperty("m_FogKeepExp2");
+        fogKeepExp2.boolValue = fogSettings.keepExp2;
+
+        graphicsManager.ApplyModifiedProperties();
+    }
+
     static void SetAudioSettings()
     {
         var config = AudioSettings.GetConfiguration();
@@ -643,15 +632,15 @@ public class EnvConfig
     static void SetPlayerSettings()
     {
         // asset bundles MUST be built with settings that are compatible with VRC client
-#if VRC_OVERRIDE_COLORSPACE_GAMMA
-            PlayerSettings.colorSpace = ColorSpace.Gamma;
-#else
-            PlayerSettings.colorSpace = ColorSpace.Linear;
-#endif
+        #if VRC_OVERRIDE_COLORSPACE_GAMMA
+        PlayerSettings.colorSpace = ColorSpace.Gamma;
+        #else
+        PlayerSettings.colorSpace = ColorSpace.Linear;
+        #endif
 
-#if !VRC_CLIENT // In client rely on platform-switcher
-            PlayerSettings.virtualRealitySupported = true;
-#endif
+        #if !VRC_CLIENT // In client rely on platform-switcher
+        PlayerSettings.SetVirtualRealitySupported(EditorUserBuildSettings.selectedBuildTargetGroup, true);
+        #endif
 
         PlayerSettings.graphicsJobs = false; // else we get occasional crashing
 
@@ -659,13 +648,84 @@ public class EnvConfig
 
         PlayerSettings.stereoRenderingPath = StereoRenderingPath.SinglePass;
 
+        #if UNITY_2018_4_OR_NEWER
+        PlayerSettings.scriptingRuntimeVersion = ScriptingRuntimeVersion.Latest;
+        #endif
+
+        #if VRC_VR_OCULUS_QUEST
+        PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
+        #elif VRC_VR_FOCUS
+        PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARMv7;
+        #endif
+
+        #if UNITY_ANDROID
+        if(PlayerSettings.Android.targetArchitectures.HasFlag(AndroidArchitecture.ARM64))
+        {
+            // Since we need different IL2CPP args we can't build ARM64 with other Architectures.
+            PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
+            PlayerSettings.SetAdditionalIl2CppArgs("");
+        }
+        else
+        {
+            PlayerSettings.SetAdditionalIl2CppArgs("--linker-flags=\"-long-plt\"");
+        }
+        #else
+        PlayerSettings.SetAdditionalIl2CppArgs("");
+        #endif
+
+        SetActiveSDKDefines();
+
         EnableBatching(true);
+    }
+
+    public static void SetActiveSDKDefines()
+    {
+        bool definesChanged = false;
+        BuildTargetGroup buildTargetGroup = BuildPipeline.GetBuildTargetGroup(EditorUserBuildSettings.activeBuildTarget);
+        List<string> defines = PlayerSettings.GetScriptingDefineSymbolsForGroup(buildTargetGroup).Split(';').ToList();
+
+        Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
+        if (assemblies.Any(assembly => assembly.GetType("VRC.Udon.UdonBehaviour") != null))
+        {
+            if (!defines.Contains("UDON", StringComparer.OrdinalIgnoreCase))
+            {
+                defines.Add("UDON");
+                definesChanged = true;
+            }
+        }
+        else if (defines.Contains("UDON"))
+            defines.Remove("UDON");
+
+        if (VRCSdk3Analysis.IsSdkDllActive(VRCSdk3Analysis.SdkVersion.VRCSDK2))
+        {
+            if (!defines.Contains("VRC_SDK_VRCSDK2", StringComparer.OrdinalIgnoreCase))
+            {
+                defines.Add("VRC_SDK_VRCSDK2");
+                definesChanged = true;
+            }
+        }
+        else if (defines.Contains("VRC_SDK_VRCSDK2"))
+            defines.Remove("VRC_SDK_VRCSDK2");
+
+        if (VRCSdk3Analysis.IsSdkDllActive(VRCSdk3Analysis.SdkVersion.VRCSDK3))
+        {
+            if (!defines.Contains("VRC_SDK_VRCSDK3", StringComparer.OrdinalIgnoreCase))
+            {
+                defines.Add("VRC_SDK_VRCSDK3");
+                definesChanged = true;
+            }
+        }
+        else if (defines.Contains("VRC_SDK_VRCSDK3"))
+            defines.Remove("VRC_SDK_VRCSDK3");
+
+        if (definesChanged)
+            PlayerSettings.SetScriptingDefineSymbolsForGroup(buildTargetGroup, string.Join(";", defines.ToArray()));
     }
 
     static void SetBuildTarget()
     {
 #if !VRC_CLIENT
-        Debug.Log("Setting build target");
+        VRC.Core.Logger.Log("Setting build target", VRC.Core.DebugLevel.All);
 
         BuildTarget target = UnityEditor.EditorUserBuildSettings.activeBuildTarget;
 
@@ -683,5 +743,35 @@ public class EnvConfig
     private static void LoadEditorResources()
     {
         AvatarPerformanceStats.Initialize();
+    }
+
+    public struct FogSettings
+    {
+        public enum FogStrippingMode
+        {
+            Automatic,
+            Custom
+        }
+        
+        public readonly FogStrippingMode fogStrippingMode;
+        public readonly bool keepLinear;
+        public readonly bool keepExp;
+        public readonly bool keepExp2;
+        
+        public FogSettings(FogStrippingMode fogStrippingMode)
+        {
+            this.fogStrippingMode = fogStrippingMode;
+            keepLinear = true;
+            keepExp = true;
+            keepExp2 = true;
+        }
+
+        public FogSettings(FogStrippingMode fogStrippingMode, bool keepLinear, bool keepExp, bool keepExp2)
+        {
+            this.fogStrippingMode = fogStrippingMode;
+            this.keepLinear = keepLinear;
+            this.keepExp = keepExp;
+            this.keepExp2 = keepExp2;
+        }
     }
 }

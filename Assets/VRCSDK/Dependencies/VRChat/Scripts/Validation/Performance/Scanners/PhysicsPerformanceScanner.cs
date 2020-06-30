@@ -27,7 +27,7 @@ namespace VRCSDK2.Validation.Performance.Scanners
                         return true;
                     }
 
-                    if(o.GetComponent<VRC_Station>() != null)
+                    if(o.GetComponent<VRC.SDKBase.VRCStation>() != null)
                     {
                         return true;
                     }
@@ -49,7 +49,7 @@ namespace VRCSDK2.Validation.Performance.Scanners
                         return true;
                     }
 
-                    if(o.GetComponent<VRC_Station>() != null)
+                    if(o.GetComponent<VRC.SDKBase.VRCStation>() != null)
                     {
                         return true;
                     }

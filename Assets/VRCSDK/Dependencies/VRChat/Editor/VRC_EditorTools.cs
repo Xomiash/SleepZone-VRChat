@@ -67,7 +67,7 @@ namespace VRCSDK2
             };
             return LayerMaskPopupInternal(selectedValue, show);
         }
-        
+
         private static T FilteredEnumPopupInternal<T>(T selectedValue, System.Func<T, bool> predicate, System.Func<int, string[], int> showPopup, System.Func<string, string> rename) where T : struct, System.IConvertible
         {
             if (!typeof(T).IsEnum)
@@ -173,12 +173,12 @@ namespace VRCSDK2
             FilteredEnumPopupInternal(selectedValue, predicate, show, rename);
         }
 
-        private static VRC_Trigger.TriggerEvent CustomTriggerPopupInternal(VRC_Trigger sourceTrigger, VRC_Trigger.TriggerEvent selectedValue, System.Func<int, string[], int> show)
+        private static VRC.SDKBase.VRC_Trigger.TriggerEvent CustomTriggerPopupInternal(VRC.SDKBase.VRC_Trigger sourceTrigger, VRC.SDKBase.VRC_Trigger.TriggerEvent selectedValue, System.Func<int, string[], int> show)
         {
             if (sourceTrigger == null)
                 return null;
 
-            VRC_Trigger.TriggerEvent[]  actionsAry = sourceTrigger.Triggers.Where(t => t.TriggerType == VRC_Trigger.TriggerType.Custom).ToArray();
+            VRC.SDKBase.VRC_Trigger.TriggerEvent[] actionsAry = sourceTrigger.Triggers.Where(t => t.TriggerType == VRC.SDKBase.VRC_Trigger.TriggerType.Custom).ToArray();
             string[] names = actionsAry.Select(t => t.Name).ToArray();
 
             int selectedIdx = Math.Max(0, names.Length - 1);
@@ -192,7 +192,7 @@ namespace VRCSDK2
             return actionsAry[show(selectedIdx, names)];
         }
 
-        public static VRC_Trigger.TriggerEvent CustomTriggerPopup(Rect rect, VRC_Trigger sourceTrigger, VRC_Trigger.TriggerEvent selectedValue, GUIStyle style = null)
+        public static VRC.SDKBase.VRC_Trigger.TriggerEvent CustomTriggerPopup(Rect rect, VRC.SDKBase.VRC_Trigger sourceTrigger, VRC.SDKBase.VRC_Trigger.TriggerEvent selectedValue, GUIStyle style = null)
         {
             System.Func<int, string[], int> show = (selectedIdx, names) =>
             {
@@ -205,7 +205,7 @@ namespace VRCSDK2
             return CustomTriggerPopupInternal(sourceTrigger, selectedValue, show);
         }
 
-        public static VRC_Trigger.TriggerEvent CustomTriggerPopup(Rect rect, string label, VRC_Trigger sourceTrigger, VRC_Trigger.TriggerEvent selectedValue, GUIStyle style = null)
+        public static VRC.SDKBase.VRC_Trigger.TriggerEvent CustomTriggerPopup(Rect rect, string label, VRC.SDKBase.VRC_Trigger sourceTrigger, VRC.SDKBase.VRC_Trigger.TriggerEvent selectedValue, GUIStyle style = null)
         {
             System.Func<int, string[], int> show = (selectedIdx, names) =>
             {
@@ -218,46 +218,46 @@ namespace VRCSDK2
             return CustomTriggerPopupInternal(sourceTrigger, selectedValue, show);
         }
 
-        public static VRC_Trigger.TriggerEvent CustomTriggerPopup(VRC_Trigger sourceTrigger, VRC_Trigger.TriggerEvent selectedValue, params GUILayoutOption[] options)
+        public static VRC.SDKBase.VRC_Trigger.TriggerEvent CustomTriggerPopup(VRC.SDKBase.VRC_Trigger sourceTrigger, VRC.SDKBase.VRC_Trigger.TriggerEvent selectedValue, params GUILayoutOption[] options)
         {
             return CustomTriggerPopupInternal(sourceTrigger, selectedValue, (selectedIdx, names) => EditorGUILayout.Popup(selectedIdx, names, options));
         }
 
-        public static VRC_Trigger.TriggerEvent CustomTriggerPopup(string label, VRC_Trigger sourceTrigger, VRC_Trigger.TriggerEvent selectedValue, params GUILayoutOption[] options)
+        public static VRC.SDKBase.VRC_Trigger.TriggerEvent CustomTriggerPopup(string label, VRC.SDKBase.VRC_Trigger sourceTrigger, VRC.SDKBase.VRC_Trigger.TriggerEvent selectedValue, params GUILayoutOption[] options)
         {
             return CustomTriggerPopupInternal(sourceTrigger, selectedValue, (selectedIdx, names) => EditorGUILayout.Popup(label, selectedIdx, names, options));
         }
 
-        public static VRC_Trigger.TriggerEvent CustomTriggerPopup(string label, VRC_Trigger sourceTrigger, string selectedValue, params GUILayoutOption[] options)
+        public static VRC.SDKBase.VRC_Trigger.TriggerEvent CustomTriggerPopup(string label, VRC.SDKBase.VRC_Trigger sourceTrigger, string selectedValue, params GUILayoutOption[] options)
         {
             if (sourceTrigger == null)
                 return null;
 
-            return CustomTriggerPopup(label, sourceTrigger, sourceTrigger.Triggers.FirstOrDefault(t => t.TriggerType == VRC_Trigger.TriggerType.Custom && t.Name == selectedValue), options);
+            return CustomTriggerPopup(label, sourceTrigger, sourceTrigger.Triggers.FirstOrDefault(t => t.TriggerType == VRC.SDKBase.VRC_Trigger.TriggerType.Custom && t.Name == selectedValue), options);
         }
 
-        public static VRC_Trigger.TriggerEvent CustomTriggerPopup(VRC_Trigger sourceTrigger, string selectedValue, params GUILayoutOption[] options)
+        public static VRC.SDKBase.VRC_Trigger.TriggerEvent CustomTriggerPopup(VRC.SDKBase.VRC_Trigger sourceTrigger, string selectedValue, params GUILayoutOption[] options)
         {
             if (sourceTrigger == null)
                 return null;
 
-            return CustomTriggerPopup(sourceTrigger, sourceTrigger.Triggers.FirstOrDefault(t => t.TriggerType == VRC_Trigger.TriggerType.Custom && t.Name == selectedValue), options);
+            return CustomTriggerPopup(sourceTrigger, sourceTrigger.Triggers.FirstOrDefault(t => t.TriggerType == VRC.SDKBase.VRC_Trigger.TriggerType.Custom && t.Name == selectedValue), options);
         }
 
-        public static VRC_Trigger.TriggerEvent CustomTriggerPopup(Rect rect, VRC_Trigger sourceTrigger, string selectedValue, GUIStyle style = null)
+        public static VRC.SDKBase.VRC_Trigger.TriggerEvent CustomTriggerPopup(Rect rect, VRC.SDKBase.VRC_Trigger sourceTrigger, string selectedValue, GUIStyle style = null)
         {
             if (sourceTrigger == null)
                 return null;
 
-            return CustomTriggerPopup(rect, sourceTrigger, sourceTrigger.Triggers.FirstOrDefault(t => t.TriggerType == VRC_Trigger.TriggerType.Custom && t.Name == selectedValue), style);
+            return CustomTriggerPopup(rect, sourceTrigger, sourceTrigger.Triggers.FirstOrDefault(t => t.TriggerType == VRC.SDKBase.VRC_Trigger.TriggerType.Custom && t.Name == selectedValue), style);
         }
 
-        public static VRC_Trigger.TriggerEvent CustomTriggerPopup(Rect rect, string label, VRC_Trigger sourceTrigger, string selectedValue, GUIStyle style = null)
+        public static VRC.SDKBase.VRC_Trigger.TriggerEvent CustomTriggerPopup(Rect rect, string label, VRC.SDKBase.VRC_Trigger sourceTrigger, string selectedValue, GUIStyle style = null)
         {
             if (sourceTrigger == null)
                 return null;
 
-            return CustomTriggerPopup(rect, label, sourceTrigger, sourceTrigger.Triggers.FirstOrDefault(t => t.TriggerType == VRC_Trigger.TriggerType.Custom && t.Name == selectedValue), style);
+            return CustomTriggerPopup(rect, label, sourceTrigger, sourceTrigger.Triggers.FirstOrDefault(t => t.TriggerType == VRC.SDKBase.VRC_Trigger.TriggerType.Custom && t.Name == selectedValue), style);
         }
 
         private static void InternalSerializedCustomTriggerPopup(SerializedProperty triggersProperty, SerializedProperty customProperty, System.Func<int, string[], int> show, System.Action fail)
@@ -278,7 +278,7 @@ namespace VRCSDK2
                     GameObject obj = triggersProperty.GetArrayElementAtIndex(idx).objectReferenceValue as GameObject;
                     if (obj != null)
                     {
-                        customNames = obj.GetComponent<VRC_Trigger>().Triggers.Where(t => t.TriggerType == VRC_Trigger.TriggerType.Custom).Select(t => t.Name).ToList();
+                        customNames = obj.GetComponent<VRC.SDKBase.VRC_Trigger>().Triggers.Where(t => t.TriggerType == VRC.SDKBase.VRC_Trigger.TriggerType.Custom).Select(t => t.Name).ToList();
                         allNull = false;
                         break;
                     }
@@ -288,7 +288,7 @@ namespace VRCSDK2
                     GameObject obj = triggersProperty.GetArrayElementAtIndex(idx).objectReferenceValue as GameObject;
                     if (obj != null)
                     {
-                        List<string> thisCustomNames = obj.GetComponent<VRC_Trigger>().Triggers.Where(t => t.TriggerType == VRC_Trigger.TriggerType.Custom).Select(t => t.Name).ToList();
+                        List<string> thisCustomNames = obj.GetComponent<VRC.SDKBase.VRC_Trigger>().Triggers.Where(t => t.TriggerType == VRC.SDKBase.VRC_Trigger.TriggerType.Custom).Select(t => t.Name).ToList();
                         customNames.RemoveAll(s => thisCustomNames.Contains(s) == false);
                     }
                 }
@@ -299,7 +299,7 @@ namespace VRCSDK2
                 if (obj != null)
                 {
                     allNull = false;
-                    customNames = obj.GetComponent<VRC_Trigger>().Triggers.Where(t => t.TriggerType == VRC_Trigger.TriggerType.Custom).Select(t => t.Name).ToList();
+                    customNames = obj.GetComponent<VRC.SDKBase.VRC_Trigger>().Triggers.Where(t => t.TriggerType == VRC.SDKBase.VRC_Trigger.TriggerType.Custom).Select(t => t.Name).ToList();
                 }
             }
 
@@ -344,10 +344,10 @@ namespace VRCSDK2
             InternalSerializedCustomTriggerPopup(triggersProperty, customProperty, (idx, names) => style == null ? EditorGUI.Popup(rect, label, idx, names) : EditorGUI.Popup(rect, label, idx, names, style), () => EditorGUI.HelpBox(rect, "Receivers do not have Custom Triggers which share names.", MessageType.Warning));
         }
 
-        public static void DrawTriggerActionCallback(string actionLabel, VRC_Trigger trigger, VRC_EventHandler.VrcEvent e)
+        public static void DrawTriggerActionCallback(string actionLabel, VRC.SDKBase.VRC_Trigger trigger, VRC.SDKBase.VRC_EventHandler.VrcEvent e)
         {
-            VRC_Trigger.TriggerEvent triggerEvent = VRC_EditorTools.CustomTriggerPopup(actionLabel, trigger, e.ParameterString); 
-            e.ParameterString = triggerEvent == null ? null : triggerEvent.Name;    
+            VRC.SDKBase.VRC_Trigger.TriggerEvent triggerEvent = VRC_EditorTools.CustomTriggerPopup(actionLabel, trigger, e.ParameterString);
+            e.ParameterString = triggerEvent == null ? null : triggerEvent.Name;
         }
 
         public static Dictionary<string, List<MethodInfo>> GetSharedAccessibleMethodsOnGameObjects(SerializedProperty objectsProperty)
@@ -402,7 +402,7 @@ namespace VRCSDK2
                     continue;
 
                 // if component is the eventhandler
-                if (t == typeof(VRC_EventHandler))
+                if (t == typeof(VRC.SDKBase.VRC_EventHandler))
                     continue;
 
                 List<MethodInfo> l = GetAccessibleMethodsForClass(t);
@@ -415,7 +415,7 @@ namespace VRCSDK2
         public static List<MethodInfo> GetAccessibleMethodsForClass(Type t)
         {
             // Get the public methods.
-            MethodInfo[] myArrayMethodInfo = t.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly);
+            MethodInfo[] myArrayMethodInfo = t.GetMethods(BindingFlags.Public | BindingFlags.Instance);
             List<MethodInfo> methods = new List<MethodInfo>();
 
             // if component is in UnityEngine namespace, skip it
@@ -430,7 +430,7 @@ namespace VRCSDK2
                 MethodInfo myMethodInfo = (MethodInfo)myArrayMethodInfo[i];
 
                 // if it's VRCSDK2, require RPC
-                if (isVRCSDK2 && myMethodInfo.GetCustomAttributes(typeof(VRCSDK2.RPC), true).Length == 0)
+                if (isVRCSDK2 && myMethodInfo.GetCustomAttributes(typeof(VRC.SDKBase.RPC), true).Length == 0)
                     continue;
 
                 methods.Add(myMethodInfo);

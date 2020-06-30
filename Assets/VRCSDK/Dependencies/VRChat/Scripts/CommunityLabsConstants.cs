@@ -2,7 +2,7 @@
 
 namespace VRCSDK2
 {
-    public class CommunityLabsConstants : MonoBehaviour
+    public class CommunityLabsConstants
     {
         public const string COMMUNITY_LABS_DOCUMENTATION_URL = "https://docs.vrchat.com/docs/vrchat-community-labs";
 

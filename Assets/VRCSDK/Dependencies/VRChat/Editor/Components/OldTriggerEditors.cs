@@ -1,4 +1,6 @@
-﻿#if UNITY_EDITOR
+﻿#if VRC_SDK_VRCSDK2
+
+#if UNITY_EDITOR
 #pragma warning disable 0618
 
 using UnityEditor;
@@ -44,4 +46,5 @@ namespace VRCSDK2
 }
 
 #pragma warning restore 0618
+#endif
 #endif

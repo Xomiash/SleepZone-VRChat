@@ -1,4 +1,5 @@
-﻿using System.Collections;
+﻿#if VRC_SDK_VRCSDK2
+using System.Collections;
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
@@ -15,3 +16,4 @@ public class VRC_ObjectSyncEditor : Editor {
         DrawDefaultInspector();
     }
 }
+#endif

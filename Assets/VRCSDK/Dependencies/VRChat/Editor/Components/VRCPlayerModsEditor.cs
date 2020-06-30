@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿#if VRC_SDK_VRCSDK2
+using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEditor;
@@ -9,7 +10,7 @@ namespace VRCSDK2
 	[CustomEditor(typeof(VRCSDK2.VRC_PlayerMods))]
 	public class VRCPlayerModsEditor : Editor 
 	{
-		VRCSDK2.VRC_PlayerMods myTarget;
+        VRCSDK2.VRC_PlayerMods myTarget;
 
 		void OnEnable()
 		{
@@ -21,7 +22,7 @@ namespace VRCSDK2
 		{
 			myTarget.isRoomPlayerMods = EditorGUILayout.Toggle("isRoomPlayerMods", myTarget.isRoomPlayerMods);
 			
-			List<VRCPlayerMod> playerMods = myTarget.playerMods;
+			List<VRCSDK2.VRCPlayerMod> playerMods = myTarget.playerMods;
 			for(int i=0; i<playerMods.Count; ++i)
 			{
 				VRCSDK2.VRCPlayerMod mod = playerMods[i];
@@ -105,3 +106,4 @@ namespace VRCSDK2
 		}
 	}
 }
+#endif

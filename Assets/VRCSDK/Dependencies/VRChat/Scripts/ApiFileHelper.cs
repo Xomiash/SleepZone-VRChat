@@ -102,8 +102,8 @@ namespace VRC.Core
         public IEnumerator UploadFile(string filename, string existingFileId, string friendlyName,
             OnFileOpSuccess onSuccess, OnFileOpError onError, OnFileOpProgress onProgress, FileOpCancelQuery cancelQuery)
         {
-            Debug.Log("UploadFile: filename: " + filename + ", file id: " +
-                      (!string.IsNullOrEmpty(existingFileId) ? existingFileId : "<new>") + ", name: " + friendlyName);
+            VRC.Core.Logger.Log("UploadFile: filename: " + filename + ", file id: " +
+                      (!string.IsNullOrEmpty(existingFileId) ? existingFileId : "<new>") + ", name: " + friendlyName, DebugLevel.All);
 
             // init remote config 
             if (!RemoteConfig.IsInitialized())
@@ -228,7 +228,7 @@ namespace VRC.Core
             if (apiFile == null)
                 yield break;
 
-            LogApiFileStatus(apiFile, false);
+            LogApiFileStatus(apiFile, false, true);
 
             while (apiFile.HasQueuedOperation(EnableDeltaCompression))
             {
@@ -630,9 +630,9 @@ namespace VRC.Core
 
             bool uploadDeltaFile = EnableDeltaCompression && deltaFileSize > 0 && deltaFileSize < fullFizeSize;
             if (EnableDeltaCompression)
-                Debug.Log("Delta size " + deltaFileSize + " (" + ((float)deltaFileSize / (float)fullFizeSize) + " %), full file size " + fullFizeSize + ", uploading " + (uploadDeltaFile ? " DELTA" : " FULL FILE"));
+                VRC.Core.Logger.Log("Delta size " + deltaFileSize + " (" + ((float)deltaFileSize / (float)fullFizeSize) + " %), full file size " + fullFizeSize + ", uploading " + (uploadDeltaFile ? " DELTA" : " FULL FILE"), DebugLevel.All);
             else
-                Debug.Log("Delta compression disabled, uploading FULL FILE, size " + fullFizeSize);
+                VRC.Core.Logger.Log("Delta compression disabled, uploading FULL FILE, size " + fullFizeSize, DebugLevel.All);
 
             LogApiFileStatus(apiFile, uploadDeltaFile);
 
@@ -850,7 +850,7 @@ namespace VRC.Core
                         ApiFile.Version.FileDescriptor.Type.file, uploadFilename, fileMD5Base64, fullFizeSize,
                         delegate (ApiFile file)
                         {
-                            Debug.Log("Successfully uploaded file.");
+                            VRC.Core.Logger.Log("Successfully uploaded file.", DebugLevel.All);
                             apiFile = file;
                         },
                         delegate (string error)
@@ -883,7 +883,7 @@ namespace VRC.Core
                     ApiFile.Version.FileDescriptor.Type.signature, signatureFilename, sigMD5Base64, sigFileSize,
                     delegate (ApiFile file)
                     {
-                        Debug.Log("Successfully uploaded file signature.");
+                        VRC.Core.Logger.Log("Successfully uploaded file signature.", DebugLevel.All);
                         apiFile = file;
                     },
                     delegate (string error)
@@ -1011,7 +1011,7 @@ namespace VRC.Core
             Success(onSuccess, apiFile, "Upload complete!");
         }
 
-        private static void LogApiFileStatus(ApiFile apiFile, bool checkDelta)
+        private static void LogApiFileStatus(ApiFile apiFile, bool checkDelta, bool logSuccess = false)
         {
             if (apiFile == null || !apiFile.IsInitialized)
             {
@@ -1021,24 +1021,24 @@ namespace VRC.Core
             {
                 Debug.LogFormat("<color=yellow>ApiFile {0} is in an error state.</color>", apiFile.name);
             }
-            else
-                Debug.LogFormat("<color=yellow>Processing {3}: {0}, {1}, {2}</color>",
-                    apiFile.IsWaitingForUpload() ? "waiting for upload" : "upload complete",
-                    apiFile.HasExistingOrPendingVersion() ? "has existing or pending version" : "no previous version",
-                    apiFile.IsLatestVersionQueued(checkDelta) ? "latest version queued" : "latest version not queued",
-                    apiFile.name);
+            else if (logSuccess)
+                VRC.Core.Logger.Log("< color = yellow > Processing { 3}: { 0}, { 1}, { 2}</ color > " +
+                    (apiFile.IsWaitingForUpload() ? "waiting for upload" : "upload complete") +
+                    (apiFile.HasExistingOrPendingVersion() ? "has existing or pending version" : "no previous version") +
+                    (apiFile.IsLatestVersionQueued(checkDelta) ? "latest version queued" : "latest version not queued") +
+                    apiFile.name, DebugLevel.All);
 
-            if (apiFile != null && apiFile.IsInitialized)
+            if (apiFile != null && apiFile.IsInitialized && logSuccess)
             {
                 var apiFields = apiFile.ExtractApiFields();
                 if (apiFields != null)
-                    Debug.LogFormat("<color=yellow>{0}</color>", VRC.Tools.JsonEncode(apiFields));
+                    VRC.Core.Logger.Log("<color=yellow>{0}</color>" + VRC.Tools.JsonEncode(apiFields), DebugLevel.All);
             }
         }
 
         public IEnumerator CreateOptimizedFileInternal(string filename, string outputFilename, Action<FileOpResult> onSuccess, Action<string> onError)
         {
-            Debug.Log("CreateOptimizedFile: " + filename + " => " + outputFilename);
+            VRC.Core.Logger.Log("CreateOptimizedFile: " + filename + " => " + outputFilename, DebugLevel.All);
 
             // assume it's a .gz, or a .unitypackage
             // else nothing to do
@@ -1047,7 +1047,7 @@ namespace VRC.Core
 
             if (!IsGZipCompressed(filename))
             {
-                Debug.Log("CreateOptimizedFile: (not gzip compressed, done)");
+                VRC.Core.Logger.Log("CreateOptimizedFile: (not gzip compressed, done)", DebugLevel.All);
                 // nothing to do
                 if (onSuccess != null)
                     onSuccess(FileOpResult.Unchanged);
@@ -1214,7 +1214,7 @@ namespace VRC.Core
 
         public IEnumerator CreateFileSignatureInternal(string filename, string outputSignatureFilename, Action onSuccess, Action<string> onError)
         {
-            Debug.Log("CreateFileSignature: " + filename + " => " + outputSignatureFilename);
+            VRC.Core.Logger.Log("CreateFileSignature: " + filename + " => " + outputSignatureFilename, DebugLevel.All);
 
             yield return null;
 
@@ -1417,7 +1417,7 @@ namespace VRC.Core
             if (apiFile == null)
                 apiFile = new ApiFile();
 
-            Debug.Log("ApiFile " + apiFile.ToStringBrief() + ": Operation Succeeded!");
+            VRC.Core.Logger.Log("ApiFile " + apiFile.ToStringBrief() + ": Operation Succeeded!", DebugLevel.All);
             if (onSuccess != null)
                 onSuccess(apiFile, message);
         }
@@ -1724,7 +1724,7 @@ namespace VRC.Core
                            uploadStatus = c.Model as ApiFile.UploadStatus;
                            wait = false;
 
-                           Debug.Log("Found existing multipart upload status (next part = " + uploadStatus.nextPartNumber + ")");
+                           VRC.Core.Logger.Log("Found existing multipart upload status (next part = " + uploadStatus.nextPartNumber + ")", DebugLevel.All);
                        },
                        (c) =>
                        {
@@ -2060,7 +2060,7 @@ namespace VRC.Core
 
         private IEnumerator UploadFileComponentInternal(ApiFile apiFile, ApiFile.Version.FileDescriptor.Type fileDescriptorType, string filename, string md5Base64, long fileSize, Action<ApiFile> onSuccess, Action<string> onError, Action<long, long> onProgess, FileOpCancelQuery cancelQuery)
         {
-            Debug.Log("UploadFileComponent: " + fileDescriptorType + " (" + apiFile.id + "): " + filename);
+            VRC.Core.Logger.Log("UploadFileComponent: " + fileDescriptorType + " (" + apiFile.id + "): " + filename, DebugLevel.All);
             ApiFile.Version.FileDescriptor fileDesc = apiFile.GetFileDescriptor(apiFile.GetLatestVersionNumber(), fileDescriptorType);
 
             if (!uploadFileComponentValidateFileDesc(apiFile, filename, md5Base64, fileSize, fileDesc, onSuccess, onError))

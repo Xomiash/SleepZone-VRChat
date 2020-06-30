@@ -36,6 +36,8 @@ public partial class VRCSdkControlPanel : EditorWindow
     static GUIStyle listButtonStyleEven;
     static GUIStyle listButtonStyleOdd;
     static GUIStyle listButtonStyleSelected;
+    static GUIStyle scrollViewSeparatorStyle;
+    static GUIStyle searchBarStyle;
 
     void InitializeStyles()
     {
@@ -52,7 +54,7 @@ public partial class VRCSdkControlPanel : EditorWindow
         boxGuiStyle = new GUIStyle();
         if (EditorGUIUtility.isProSkin)
         {
-            boxGuiStyle.normal.background = CreateBackgroundColorImage(new Color(0.6f, 0.6f, 0.6f));
+            boxGuiStyle.normal.background = CreateBackgroundColorImage(new Color(0.3f, 0.3f, 0.3f));
             boxGuiStyle.normal.textColor = Color.white;
         }
         else
@@ -110,6 +112,17 @@ public partial class VRCSdkControlPanel : EditorWindow
             listButtonStyleSelected.normal.textColor = Color.black;
             listButtonStyleSelected.normal.background = CreateBackgroundColorImage(new Color(0.75f, 0.75f, 0.75f));
         }
+
+        scrollViewSeparatorStyle = new GUIStyle("Toolbar");
+        scrollViewSeparatorStyle.fixedWidth = SdkWindowWidth + 10;
+        scrollViewSeparatorStyle.fixedHeight = 4;
+        scrollViewSeparatorStyle.margin.top = 1;
+
+        searchBarStyle = new GUIStyle("Toolbar");
+        searchBarStyle.fixedWidth = SdkWindowWidth;
+        searchBarStyle.fixedHeight = 23;
+        searchBarStyle.padding.top = 3;
+
     }
 
     void Init()
@@ -147,19 +160,43 @@ public partial class VRCSdkControlPanel : EditorWindow
 
         if (_bannerImage == null)
             _bannerImage = AssetDatabase.LoadAssetAtPath("Assets/VRCSDK/Dependencies/VRChat/SdkGraphics/SDK_Panel_Banner.png", typeof(Texture2D)) as Texture2D;
+
+        GUILayout.BeginHorizontal();
+        GUILayout.FlexibleSpace();
+        GUILayout.BeginVertical();
+
         GUILayout.Box(_bannerImage);
 
         if (Application.isPlaying)
         {
-            EditorGUILayout.LabelField("You cannot edit your VRChat data while the Unity Application is running");
+            GUI.enabled = false;
+            GUILayout.Space(20);
+            EditorGUILayout.LabelField("Unity Application is running ...\nStop it to access the Control Panel", titleGuiStyle, GUILayout.Width(SdkWindowWidth));
+            GUI.enabled = true;
+            GUILayout.EndVertical();
+            GUILayout.FlexibleSpace();
+            GUILayout.EndHorizontal();
             return;
         }
 
         EditorGUILayout.Space();
 
-        VRCSettings.Get().activeWindowPanel = GUILayout.Toolbar(VRCSettings.Get().activeWindowPanel, new string[] { "Authentication", "Builder", "Content Manager", "Settings" }, GUILayout.Width(SdkWindowWidth));
+        EnvConfig.SetActiveSDKDefines();
 
-        int showPanel = VRCSettings.Get().activeWindowPanel;
+        #if VRC_SDK_VRCSDK2
+            VRCSettings.Get().activeWindowPanel = GUILayout.Toolbar(VRCSettings.Get().activeWindowPanel, new string[] { "Authentication", "Builder", "Content Manager", "Settings" }, GUILayout.Width(SdkWindowWidth));
+            int showPanel = VRCSettings.Get().activeWindowPanel;
+        #elif VRC_SDK_VRCSDK3
+            VRC.SDK3.Editor.VRCSettings.Get().activeWindowPanel = GUILayout.Toolbar(VRC.SDK3.Editor.VRCSettings.Get().activeWindowPanel, new string[] { "Authentication", "Builder", "Content Manager", "Settings" }, GUILayout.Width(SdkWindowWidth));
+            int showPanel = VRC.SDK3.Editor.VRCSettings.Get().activeWindowPanel;
+        #else
+            int showPanel = 0;
+        #endif
+
+        GUILayout.EndVertical();
+        GUILayout.FlexibleSpace();
+        GUILayout.EndHorizontal();
+
         if (APIUser.IsLoggedInWithCredentials == false && showPanel != 3)
             showPanel = 0;
 
@@ -196,11 +233,15 @@ public partial class VRCSdkControlPanel : EditorWindow
     public void Reset()
     {
         ResetIssues();
+        // style backgrounds may be nulled on scene load. detect if so has happened
+        if((boxGuiStyle != null) && (boxGuiStyle.normal.background == null))
+            InitializeStyles();
     }
 
     [UnityEditor.Callbacks.DidReloadScripts(int.MaxValue)]
     static void DidReloadScripts()
     {
         RefreshApiUrlSetting();
+        DetectPostProcessingPackage();
     }
 }

@@ -1,11 +1,9 @@
-﻿﻿#define SUPPORT_DEPRECATED_ONSP
- 
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Profiling;
 
- namespace VRCSDK2.Validation
+namespace VRCSDK2.Validation
 {
     public static class AvatarValidation
     {
@@ -26,6 +24,8 @@ using UnityEngine.Profiling;
 #endif
             "VRCSDK2.VRC_AvatarDescriptor",
             "VRCSDK2.VRC_AvatarVariations",
+            "VRC.SDK3.Components.VRCAvatarDescriptor",
+            "VRC.SDK3.Components.VRCAvatarVariations",
             "NetworkMetadata",
             "RootMotion.FinalIK.IKExecutionOrder",
             "RootMotion.FinalIK.VRIK",
@@ -71,6 +71,12 @@ using UnityEngine.Profiling;
             "UnityEngine.CapsuleCollider",
             "UnityEngine.Rigidbody",
             "UnityEngine.Joint",
+            "UnityEngine.Animations.AimConstraint",
+            "UnityEngine.Animations.LookAtConstraint",
+            "UnityEngine.Animations.ParentConstraint",
+            "UnityEngine.Animations.PositionConstraint",
+            "UnityEngine.Animations.RotationConstraint",
+            "UnityEngine.Animations.ScaleConstraint",
             "UnityEngine.Camera",
 #endif
             "UnityEngine.FlareLayer",
@@ -79,19 +85,18 @@ using UnityEngine.Profiling;
             "UnityEngine.AudioSource",
             "ONSPAudioSource",
             "VRCSDK2.VRC_SpatialAudioSource",
+            "VRC.SDK3.Components.VRCSpatialAudioSource",
 #endif
             "AvatarCustomAudioLimiter",
-            "UnityEngine.EllipsoidParticleEmitter",
-            "UnityEngine.ParticleRenderer",
-            "UnityEngine.ParticleAnimator",
-            "UnityEngine.MeshParticleEmitter",
             "UnityEngine.LineRenderer",
             "VRCSDK2.VRC_IKFollower",
+            "VRC.SDK3.Components.VRCIKFollower",
             "VRC_IKFollowerInternal",
             "RealisticEyeMovements.EyeAndHeadAnimator",
             "RealisticEyeMovements.LookTargetController",
             "AvatarAudioSourceFilter",
             "VRCSDK2.VRC_Station",
+            "VRC.SDK3.Components.VRCStation",
             "VRC_StationInternal",
             "VRC.AvatarPerformanceComponentSettings",
         };
@@ -128,9 +133,9 @@ using UnityEngine.Profiling;
         private static int _enforceAvatarStationsFrameNumber = 0;
         private static int _enforceAvatarStationsProcessedThisFrame = 0;
 
-        public static IEnumerator RemoveIllegalComponentsEnumerator(GameObject target, bool retry = true)
+        public static void RemoveIllegalComponents(GameObject target, bool retry = true)
         {
-            return ValidationUtils.RemoveIllegalComponentsEnumerator(target, ValidationUtils.WhitelistedTypes("avatar", ComponentTypeWhiteList), retry);
+            ValidationUtils.RemoveIllegalComponents(target, ValidationUtils.WhitelistedTypes("avatar", ComponentTypeWhiteList), retry);
         }
 
         public static IEnumerable<Component> FindIllegalComponents(GameObject target)
@@ -150,7 +155,62 @@ using UnityEngine.Profiling;
             return found;
         }
 
-        public static IEnumerator EnforceAudioSourceLimitsEnumerator(GameObject currentAvatar, System.Action<AudioSource> onFound)
+        static void ProcessSpatialAudioSources(AudioSource audioSource)
+        {
+#if VRC_SDK_VRCSDK2
+            VRC_SpatialAudioSource vrcSpatialAudioSource2 = audioSource.gameObject.GetComponent<VRC_SpatialAudioSource>();
+            if (vrcSpatialAudioSource2 == null)
+            {
+                // user has not yet added VRC_SpatialAudioSource (or ONSP)
+                // so set up some defaults
+                vrcSpatialAudioSource2 = audioSource.gameObject.AddComponent<VRC_SpatialAudioSource>();
+                vrcSpatialAudioSource2.Gain = AudioManagerSettings.AvatarAudioMaxGain;
+                vrcSpatialAudioSource2.Far = AudioManagerSettings.AvatarAudioMaxRange;
+                vrcSpatialAudioSource2.Near = 0f;
+                vrcSpatialAudioSource2.VolumetricRadius = 0f;
+                vrcSpatialAudioSource2.EnableSpatialization = true;
+                vrcSpatialAudioSource2.enabled = true;
+                audioSource.spatialize = true;
+                audioSource.priority = Mathf.Clamp(audioSource.priority, 200, 255);
+                audioSource.bypassEffects = false;
+                audioSource.bypassListenerEffects = false;
+                audioSource.spatialBlend = 1f;
+                audioSource.spread = 0;
+
+                // user is allowed to change, but for now put a safe default
+                audioSource.maxDistance = AudioManagerSettings.AvatarAudioMaxRange;
+                audioSource.minDistance = audioSource.maxDistance / 500f;
+                audioSource.rolloffMode = AudioRolloffMode.Logarithmic;
+            }
+#elif VRC_SDK_VRCSDK3
+            VRC.SDK3.Components.VRCSpatialAudioSource vrcSpatialAudioSource2 = audioSource.gameObject.GetComponent<VRC.SDK3.Components.VRCSpatialAudioSource>();
+            if (vrcSpatialAudioSource2 == null)
+            {
+                // user has not yet added VRC_SpatialAudioSource (or ONSP)
+                // so set up some defaults
+                vrcSpatialAudioSource2 = audioSource.gameObject.AddComponent<VRC.SDK3.Components.VRCSpatialAudioSource>();
+                vrcSpatialAudioSource2.Gain = AudioManagerSettings.AvatarAudioMaxGain;
+                vrcSpatialAudioSource2.Far = AudioManagerSettings.AvatarAudioMaxRange;
+                vrcSpatialAudioSource2.Near = 0f;
+                vrcSpatialAudioSource2.VolumetricRadius = 0f;
+                vrcSpatialAudioSource2.EnableSpatialization = true;
+                vrcSpatialAudioSource2.enabled = true;
+                audioSource.spatialize = true;
+                audioSource.priority = Mathf.Clamp(audioSource.priority, 200, 255);
+                audioSource.bypassEffects = false;
+                audioSource.bypassListenerEffects = false;
+                audioSource.spatialBlend = 1f;
+                audioSource.spread = 0;
+
+                // user is allowed to change, but for now put a safe default
+                audioSource.maxDistance = AudioManagerSettings.AvatarAudioMaxRange;
+                audioSource.minDistance = audioSource.maxDistance / 500f;
+                audioSource.rolloffMode = AudioRolloffMode.Logarithmic;
+            }
+#endif
+        }
+
+        private static IEnumerator EnforceAudioSourceLimitsEnumerator(GameObject currentAvatar, System.Action<AudioSource> onFound)
         {
             if (currentAvatar == null)
             {
@@ -165,13 +225,13 @@ using UnityEngine.Profiling;
 
             while (children.Count > 0)
             {
-                if(Time.frameCount > _enforceAudioSourcesFrameNumber)
+                if (Time.frameCount > _enforceAudioSourcesFrameNumber)
                 {
                     _enforceAudioSourcesFrameNumber = Time.frameCount;
                     _enforceAudioSourcesProcessedThisFrame = 0;
                 }
 
-                if(_enforceAudioSourcesProcessedThisFrame > ENFORCE_AUDIO_SOURCE_GAMEOBJECTS_PER_FRAME)
+                if (_enforceAudioSourcesProcessedThisFrame > ENFORCE_AUDIO_SOURCE_GAMEOBJECTS_PER_FRAME)
                 {
                     yield return null;
                 }
@@ -192,13 +252,13 @@ using UnityEngine.Profiling;
                     children.Enqueue(child.transform.GetChild(idx).gameObject);
                 }
 
-                #if VRC_CLIENT
+#if VRC_CLIENT
                 if (child.GetComponent<USpeaker>() != null)
                 {
                     Profiler.EndSample();
                     continue;
                 }
-                #endif
+#endif
 
                 AudioSource[] sources = child.transform.GetComponents<AudioSource>();
                 if (sources != null && sources.Length > 0)
@@ -209,65 +269,14 @@ using UnityEngine.Profiling;
                         Profiler.EndSample();
                         continue;
                     }
-                    
 
-                    #if VRC_CLIENT
+
+#if VRC_CLIENT
                     audioSource.outputAudioMixerGroup = VRCAudioManager.GetAvatarGroup();
                     audioSource.priority = Mathf.Clamp(audioSource.priority, 200, 255);
-                    #else
-                    VRC_SpatialAudioSource vrcSpatialAudioSource = audioSource.gameObject.GetComponent<VRC_SpatialAudioSource>();
-
-                    // these are SDK only, we rely on AvatarAudioSourceLimiter to enforce
-                    // values at runtime
-
-                    #if SUPPORT_DEPRECATED_ONSP
-                    ONSPAudioSource[] allOnsp = audioSource.gameObject.GetComponents<ONSPAudioSource>();
-                    if (allOnsp != null && allOnsp.Length > 0)
-                    {
-                        ONSPAudioSource onsp = allOnsp[0];
-                        if (vrcSpatialAudioSource == null)
-                        {
-                            vrcSpatialAudioSource = audioSource.gameObject.AddComponent<VRC_SpatialAudioSource>();
-                        }
-
-                        vrcSpatialAudioSource.Gain = Mathf.Min(onsp.Gain, VRCSDK2.AudioManagerSettings.AvatarAudioMaxGain);
-                        vrcSpatialAudioSource.Far = Mathf.Min(onsp.Far, VRCSDK2.AudioManagerSettings.AvatarAudioMaxRange);
-                        vrcSpatialAudioSource.VolumetricRadius = Mathf.Min(onsp.Far, VRCSDK2.AudioManagerSettings.AvatarAudioMaxRange);
-                        vrcSpatialAudioSource.Near = Mathf.Min(onsp.Near, onsp.Far);
-                        vrcSpatialAudioSource.EnableSpatialization = onsp.EnableSpatialization;
-                        vrcSpatialAudioSource.UseAudioSourceVolumeCurve = !onsp.UseInvSqr;
-
-                        Debug.LogWarningFormat("ONSPAudioSource found on {0}. converted to VRC_SpatialAudioSource.", child.name);
-                        foreach (var o in allOnsp)
-                        {
-                            Object.DestroyImmediate(o, true);
-                        }
-                    }
-                    #endif
-                    if (vrcSpatialAudioSource == null)
-                    {
-                        // user has not yet added VRC_SpatialAudioSource (or ONSP)
-                        // so set up some defaults
-                        vrcSpatialAudioSource = audioSource.gameObject.AddComponent<VRC_SpatialAudioSource>();
-                        vrcSpatialAudioSource.Gain = AudioManagerSettings.AvatarAudioMaxGain;
-                        vrcSpatialAudioSource.Far = AudioManagerSettings.AvatarAudioMaxRange;
-                        vrcSpatialAudioSource.Near = 0f;
-                        vrcSpatialAudioSource.VolumetricRadius = 0f;
-                        vrcSpatialAudioSource.EnableSpatialization = true;
-                        vrcSpatialAudioSource.enabled = true;
-                        audioSource.spatialize = true;
-                        audioSource.priority = Mathf.Clamp(audioSource.priority, 200, 255);
-                        audioSource.bypassEffects = false;
-                        audioSource.bypassListenerEffects = false;
-                        audioSource.spatialBlend = 1f;
-                        audioSource.spread = 0;
-
-                        // user is allowed to change, but for now put a safe default
-                        audioSource.maxDistance = AudioManagerSettings.AvatarAudioMaxRange;
-                        audioSource.minDistance = audioSource.maxDistance/500f;
-                        audioSource.rolloffMode = AudioRolloffMode.Logarithmic;
-                    }
-                    #endif //!VRC_CLIENT
+#else
+                        ProcessSpatialAudioSources( audioSource );
+#endif //!VRC_CLIENT
 
                     onFound(audioSource);
 
@@ -282,12 +291,12 @@ using UnityEngine.Profiling;
                                 continue;
                             }
 
-                            #if VRC_CLIENT
+#if VRC_CLIENT
                             sources[i].enabled = false;
                             sources[i].clip = null;
-                            #else
+#else
                             ValidationUtils.RemoveComponent(sources[i]);
-                            #endif //!VRC_CLIENT
+#endif //!VRC_CLIENT
                         }
                     }
                 }
@@ -383,9 +392,9 @@ using UnityEngine.Profiling;
             }
         }
 
-        public static List<VRC_Station> EnforceAvatarStationLimits(GameObject currentAvatar)
+        public static List<VRC.SDKBase.VRCStation> EnforceAvatarStationLimits(GameObject currentAvatar)
         {
-            List<VRC_Station> found = new List<VRC_Station>();
+            List<VRC.SDKBase.VRCStation> found = new List<VRC.SDKBase.VRCStation>();
             IEnumerator enforcer = EnforceAvatarStationLimitsEnumerator(currentAvatar, (a) => found.Add(a));
             while (enforcer.MoveNext())
             {
@@ -395,7 +404,7 @@ using UnityEngine.Profiling;
             return found;
         }
 
-        public static IEnumerator EnforceAvatarStationLimitsEnumerator(GameObject currentAvatar, System.Action<VRC_Station> onFound)
+        public static IEnumerator EnforceAvatarStationLimitsEnumerator(GameObject currentAvatar, System.Action<VRC.SDKBase.VRCStation> onFound)
         {
             Queue<GameObject> children = new Queue<GameObject>();
             children.Enqueue(currentAvatar.gameObject);
@@ -404,13 +413,13 @@ using UnityEngine.Profiling;
             uint objectsProcessedThisFrame = 0;
             while (children.Count > 0)
             {
-                if(Time.frameCount > _enforceAvatarStationsFrameNumber)
+                if (Time.frameCount > _enforceAvatarStationsFrameNumber)
                 {
                     _enforceAvatarStationsFrameNumber = Time.frameCount;
                     _enforceAvatarStationsProcessedThisFrame = 0;
                 }
 
-                if(_enforceAvatarStationsProcessedThisFrame > ENFORCE_STATIONS_GAMEOBJECTS_PER_FRAME)
+                if (_enforceAvatarStationsProcessedThisFrame > ENFORCE_STATIONS_GAMEOBJECTS_PER_FRAME)
                 {
                     yield return null;
                 }
@@ -431,10 +440,10 @@ using UnityEngine.Profiling;
                     children.Enqueue(child.transform.GetChild(idx).gameObject);
                 }
 
-                VRC_Station[] stations = child.transform.GetComponents<VRC_Station>();
+                VRC.SDKBase.VRCStation[] stations = child.transform.GetComponents<VRC.SDKBase.VRCStation>();
                 if (stations != null && stations.Length > 0)
                 {
-                    foreach(VRC_Station station in stations)
+                    foreach (VRC.SDKBase.VRCStation station in stations)
                     {
                         if (station == null)
                         {
@@ -442,9 +451,9 @@ using UnityEngine.Profiling;
                             continue;
                         }
 
-                        #if VRC_CLIENT
+#if VRC_CLIENT
                         VRC_StationInternal stationInternal = station.transform.GetComponent<VRC_StationInternal>();
-                        #endif
+#endif
                         if (stationCount < MAX_STATIONS_PER_AVATAR)
                         {
                             bool markedForDestruction = false;
@@ -459,32 +468,32 @@ using UnityEngine.Profiling;
                             {
                                 if (Vector3.Distance(station.stationEnterPlayerLocation.position, station.transform.position) > MAX_STATION_LOCATION_DISTANCE)
                                 {
-                                    #if VRC_CLIENT
+#if VRC_CLIENT
                                     markedForDestruction = true;
                                     Debug.LogError("[" + currentAvatar.name + "]==> Station enter location is too far from station (max dist=" + MAX_STATION_LOCATION_DISTANCE + "). Station disabled.");
-                                    #else
+#else
                                     Debug.LogError("Station enter location is too far from station (max dist="+MAX_STATION_LOCATION_DISTANCE+"). Station will be disabled at runtime.");
-                                    #endif
+#endif
                                 }
                                 if (Vector3.Distance(station.stationExitPlayerLocation.position, station.transform.position) > MAX_STATION_LOCATION_DISTANCE)
                                 {
-                                    #if VRC_CLIENT
+#if VRC_CLIENT
                                     markedForDestruction = true;
                                     Debug.LogError("[" + currentAvatar.name + "]==> Station exit location is too far from station (max dist=" + MAX_STATION_LOCATION_DISTANCE + "). Station disabled.");
-                                    #else
+#else
                                     Debug.LogError("Station exit location is too far from station (max dist="+MAX_STATION_LOCATION_DISTANCE+"). Station will be disabled at runtime.");
-                                    #endif
+#endif
                                 }
 
                                 if (markedForDestruction)
                                 {
-                                    #if VRC_CLIENT
+#if VRC_CLIENT
                                     ValidationUtils.RemoveComponent(station);
                                     if (stationInternal != null)
                                     {
                                         ValidationUtils.RemoveComponent(stationInternal);
                                     }
-                                    #endif
+#endif
                                 }
                                 else
                                 {
@@ -498,7 +507,7 @@ using UnityEngine.Profiling;
                         }
                         else
                         {
-                            #if VRC_CLIENT
+#if VRC_CLIENT
                             Debug.LogError("[" + currentAvatar.name + "]==> Removing station over limit of " + MAX_STATIONS_PER_AVATAR);
                             ValidationUtils.RemoveComponent(station);
                             if (stationInternal != null)
@@ -506,9 +515,9 @@ using UnityEngine.Profiling;
                                 ValidationUtils.RemoveComponent(stationInternal);
                             }
 
-                            #else
+#else
                             Debug.LogError("Too many stations on avatar("+ currentAvatar.name +"). Maximum allowed="+MAX_STATIONS_PER_AVATAR+". Extra stations will be removed at runtime.");
-                            #endif
+#endif
                         }
 
                         stationCount++;
@@ -516,7 +525,7 @@ using UnityEngine.Profiling;
                 }
                 Profiler.EndSample();
 
-                if(objectsProcessedThisFrame < ENFORCE_STATIONS_GAMEOBJECTS_PER_FRAME)
+                if (objectsProcessedThisFrame < ENFORCE_STATIONS_GAMEOBJECTS_PER_FRAME)
                 {
                     continue;
                 }
@@ -561,7 +570,7 @@ using UnityEngine.Profiling;
                     continue;
                 StripRuntimeAnimatorController(anim.runtimeAnimatorController);
             }
-            foreach (VRC_Station station in currentAvatar.GetComponentsInChildren<VRC_Station>(true))
+            foreach (VRC.SDKBase.VRCStation station in currentAvatar.GetComponentsInChildren<VRC.SDKBase.VRCStation>(true))
             {
                 if (station == null)
                     continue;
@@ -625,8 +634,8 @@ using UnityEngine.Profiling;
         private static Color32 GetTrustLevelColor(VRC.Core.APIUser user)
         {
 #if VRC_CLIENT
-            Color32 color = new Color32(255,255,255,255);
-            if (user==null)
+            Color32 color = new Color32(255, 255, 255, 255);
+            if (user == null)
             {
                 return color;
             }
@@ -696,26 +705,26 @@ using UnityEngine.Profiling;
 
         public static void ReplaceShaders(VRC.Core.APIUser user, IEnumerable<Renderer> avatarRenderers, FallbackMaterialCache fallbackMaterialCache, bool debug = true)
         {
-            foreach(Renderer avatarRenderer in avatarRenderers)
+            foreach (Renderer avatarRenderer in avatarRenderers)
             {
                 //TODO 2018.4 LTS: Replace this with avatarRenderer.GetSharedMaterials(List<Material> sharedMaterials);
-                if(avatarRenderer == null) continue;
+                if (avatarRenderer == null) continue;
                 Material[] avatarRendererSharedMaterials = avatarRenderer.sharedMaterials;
-                for(int i = 0; i < avatarRendererSharedMaterials.Length; ++i)
+                for (int i = 0; i < avatarRendererSharedMaterials.Length; ++i)
                 {
                     Material currentMaterial = avatarRendererSharedMaterials[i];
-                    if(currentMaterial == null)
+                    if (currentMaterial == null)
                     {
                         continue;
                     }
 
                     Material fallbackMaterial;
-                    if(fallbackMaterialCache.HasFallbackMaterial(currentMaterial))
+                    if (fallbackMaterialCache.HasFallbackMaterial(currentMaterial))
                     {
                         // material is in our swap list, so its already a fallback
                         fallbackMaterial = fallbackMaterialCache.GetFallBackMaterial(currentMaterial);
 
-                        if(debug)
+                        if (debug)
                         {
                             Debug.Log(string.Format("<color=cyan>*** Using existing fallback: '{0}' </color>", fallbackMaterial.shader.name));
                         }
@@ -730,7 +739,7 @@ using UnityEngine.Profiling;
 
                         fallbackMaterialCache.AddFallbackMaterial(fallbackMaterial, fallbackMaterial);
 
-                        if(debug)
+                        if (debug)
                         {
                             Debug.Log(string.Format("<color=cyan>*** Creating new fallback: '{0}' </color>", fallbackMaterial.shader.name));
                         }
@@ -958,5 +967,41 @@ using UnityEngine.Profiling;
         {
             return ShaderValidation.FindIllegalShaders(target, ShaderWhiteList);
         }
+
+        /// <summary>
+        /// NOTE: intended to be called from 'VRCAvatarManager.SafetyCheckAndComponentScan'
+        /// but temporarily disabled (until we enable texture streaming)
+        /// </summary>  
+        public static void ReportTexturesWithoutMipMapStreaming(VRC.Core.ApiAvatar avatar, GameObject target)
+        {
+            var badTextures = new List<Texture2D>();
+            foreach (Renderer r in target.GetComponentsInChildren<Renderer>())
+            {
+                foreach (Material m in r.sharedMaterials)
+                {
+                    foreach (int i in m.GetTexturePropertyNameIDs())
+                    {
+                        Texture2D t = m.GetTexture(i) as Texture2D;
+                        if (!t)
+                            continue;
+                        if ((t.mipmapCount > 0) && !t.streamingMipmaps)
+                            badTextures.Add(t);
+                    }
+                }
+            }
+
+            if (badTextures.Count > 0)
+            {
+                string warning = "[" + avatar.name + "]==> One or more avatar textures have non-streaming mipmaps: ";
+                foreach (Texture2D t in badTextures)
+                {
+                    warning += "'" + t.name + "', ";
+                }
+                warning = warning.Remove(warning.LastIndexOf(","));
+                Debug.LogWarning(warning + ".");
+            }
+
+        }
+
     }
 }

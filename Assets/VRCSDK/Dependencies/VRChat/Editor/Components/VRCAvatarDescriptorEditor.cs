@@ -1,3 +1,4 @@
+#if VRC_SDK_VRCSDK2
 using UnityEngine;
 using UnityEditor;
 using System.Collections;
@@ -11,6 +12,8 @@ public class AvatarDescriptorEditor : Editor
 
     SkinnedMeshRenderer selectedMesh;
     List<string> blendShapeNames = null;
+
+    bool shouldRefreshVisemes = false;
 
     public override void OnInspectorGUI()
     {
@@ -70,7 +73,10 @@ public class AvatarDescriptorEditor : Editor
                 break;
 
             case VRCSDK2.VRC_AvatarDescriptor.LipSyncStyle.VisemeBlendShape:
+                SkinnedMeshRenderer prev = avatarDescriptor.VisemeSkinnedMesh;
                 avatarDescriptor.VisemeSkinnedMesh = (SkinnedMeshRenderer)EditorGUILayout.ObjectField("Face Mesh", avatarDescriptor.VisemeSkinnedMesh, typeof(SkinnedMeshRenderer), true);
+                if (avatarDescriptor.VisemeSkinnedMesh != prev)
+                    shouldRefreshVisemes = true;
                 if (avatarDescriptor.VisemeSkinnedMesh != null)
                 {
                     DetermineBlendShapeNames();
@@ -89,6 +95,9 @@ public class AvatarDescriptorEditor : Editor
                         if (next >= 0)
                             avatarDescriptor.VisemeBlendShapes[i] = blendShapeNames[next];
                     }
+
+                    if (shouldRefreshVisemes)
+                        AutoDetectVisemes();
                 }
                 break;
         }
@@ -103,9 +112,74 @@ public class AvatarDescriptorEditor : Editor
             blendShapeNames = new List<string>();
             blendShapeNames.Add("-none-");
             selectedMesh = avatarDescriptor.VisemeSkinnedMesh;
-            for (int i = 0; i < selectedMesh.sharedMesh.blendShapeCount; ++i)
-                blendShapeNames.Add(selectedMesh.sharedMesh.GetBlendShapeName(i));
+            if ((selectedMesh != null) && (selectedMesh.sharedMesh != null))
+            {
+                for (int i = 0; i < selectedMesh.sharedMesh.blendShapeCount; ++i)
+                    blendShapeNames.Add(selectedMesh.sharedMesh.GetBlendShapeName(i));
+            }
         }
+    }
+
+    void AutoDetectVisemes()
+    {
+
+        // prioritize strict - but fallback to looser - naming and don't touch user-overrides
+
+        List<string> blendShapes = new List<string>(blendShapeNames);
+        blendShapes.Remove("-none-");
+
+        for (int v = 0; v < avatarDescriptor.VisemeBlendShapes.Length; v++)
+        {
+            if (string.IsNullOrEmpty(avatarDescriptor.VisemeBlendShapes[v]))
+            {
+                string viseme = ((VRCSDK2.VRC_AvatarDescriptor.Viseme)v).ToString().ToLowerInvariant();
+
+                foreach (string s in blendShapes)
+                {
+                    if (s.ToLowerInvariant() == "vrc.v_" + viseme)
+                    {
+                        avatarDescriptor.VisemeBlendShapes[v] = s;
+                        goto next;
+                    }
+                }
+                foreach (string s in blendShapes)
+                {
+                    if (s.ToLowerInvariant() == "v_" + viseme)
+                    {
+                        avatarDescriptor.VisemeBlendShapes[v] = s;
+                        goto next;
+                    }
+                }
+                foreach (string s in blendShapes)
+                {
+                    if (s.ToLowerInvariant().EndsWith(viseme))
+                    {
+                        avatarDescriptor.VisemeBlendShapes[v] = s;
+                        goto next;
+                    }
+                }
+                foreach (string s in blendShapes)
+                {
+                    if (s.ToLowerInvariant() == viseme)
+                    {
+                        avatarDescriptor.VisemeBlendShapes[v] = s;
+                        goto next;
+                    }
+                }
+                foreach (string s in blendShapes)
+                {
+                    if (s.ToLowerInvariant().Contains(viseme))
+                    {
+                        avatarDescriptor.VisemeBlendShapes[v] = s;
+                        goto next;
+                    }
+                }
+                next: { }
+            }
+        }
+
+        shouldRefreshVisemes = false;
+
     }
 
     void AutoDetectLipSync()
@@ -115,14 +189,28 @@ public class AvatarDescriptorEditor : Editor
         {
             if (smr.sharedMesh.blendShapeCount > 0)
             {
-                avatarDescriptor.lipSync = VRCSDK2.VRC_AvatarDescriptor.LipSyncStyle.JawFlapBlendShape;
-                avatarDescriptor.VisemeSkinnedMesh = null;
                 avatarDescriptor.lipSyncJawBone = null;
+
+                if (smr.sharedMesh.blendShapeCount > 1)
+                {
+                    avatarDescriptor.lipSync = VRCSDK2.VRC_AvatarDescriptor.LipSyncStyle.VisemeBlendShape;
+                    avatarDescriptor.VisemeSkinnedMesh = smr;
+                    shouldRefreshVisemes = true;
+                }
+                else
+                {
+                    avatarDescriptor.lipSync = VRCSDK2.VRC_AvatarDescriptor.LipSyncStyle.JawFlapBlendShape;
+                    avatarDescriptor.VisemeSkinnedMesh = null;
+                }
+
                 return;
             }
         }
 
-        if (avatarDescriptor.GetComponent<Animator>().GetBoneTransform(HumanBodyBones.Jaw) != null)
+        Animator a = avatarDescriptor.GetComponent<Animator>();
+        if (!a)
+            EditorUtility.DisplayDialog("Ooops", "This avatar has no Animator and can have no lipsync.", "OK");
+        else if (a.GetBoneTransform(HumanBodyBones.Jaw) != null)
         {
             avatarDescriptor.lipSync = VRCSDK2.VRC_AvatarDescriptor.LipSyncStyle.JawFlapBone;
             avatarDescriptor.lipSyncJawBone = avatarDescriptor.GetComponent<Animator>().GetBoneTransform(HumanBodyBones.Jaw);
@@ -132,3 +220,4 @@ public class AvatarDescriptorEditor : Editor
 
     }
 }
+#endif

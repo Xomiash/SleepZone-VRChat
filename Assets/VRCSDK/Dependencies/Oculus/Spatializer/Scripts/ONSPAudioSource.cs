@@ -257,7 +257,7 @@ public class ONSPAudioSource : MonoBehaviour
     public void SetParameters(ref AudioSource source)
 	{
     // VRCHAT: indentation is weird intentionally, for easier diff
-    // jnuccio: added try here to catch unknown exception reported in analytics
+    // VRC jnuccio: added try here to catch unknown exception reported in analytics
     try
     {
         if (source == null)

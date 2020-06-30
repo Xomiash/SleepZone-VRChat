@@ -11,7 +11,8 @@ public partial class VRCSdkControlPanel : EditorWindow
     static string error = null;
 
     public static bool FutureProofPublishEnabled { get { return UnityEditor.EditorPrefs.GetBool("futureProofPublish", DefaultFutureProofPublishEnabled); } }
-    public static bool DefaultFutureProofPublishEnabled { get { return !SDKClientUtilities.IsInternalSDK(); } }
+    //public static bool DefaultFutureProofPublishEnabled { get { return !SDKClientUtilities.IsInternalSDK(); } }
+    public static bool DefaultFutureProofPublishEnabled { get { return true; } }
 
     static string storedUsername
     {
@@ -198,8 +199,13 @@ public partial class VRCSdkControlPanel : EditorWindow
             InitAccount();
 
             ApiServerEnvironment newEnv = ApiServerEnvironment.Release;
-            if (VRCSettings.Get().DisplayAdvancedSettings)
-                newEnv = (ApiServerEnvironment)EditorGUILayout.EnumPopup("Use API", serverEnvironment);
+            #if VRC_SDK_VRCSDK2
+                if (VRCSettings.Get().DisplayAdvancedSettings)
+                    newEnv = (ApiServerEnvironment)EditorGUILayout.EnumPopup("Use API", serverEnvironment);
+            #elif VRC_SDK_VRCSDK3
+                if (VRC.SDK3.Editor.VRCSettings.Get().DisplayAdvancedSettings)
+                    newEnv = (ApiServerEnvironment)EditorGUILayout.EnumPopup("Use API", serverEnvironment);
+            #endif
             if (serverEnvironment != newEnv)
                 serverEnvironment = newEnv;
 
@@ -229,8 +235,8 @@ public partial class VRCSdkControlPanel : EditorWindow
     {
         EditorGUILayout.LabelField("Logged in as:", APIUser.CurrentUser.displayName);
 
-        if (SDKClientUtilities.IsInternalSDK())
-            EditorGUILayout.LabelField("Developer Status: ", APIUser.CurrentUser.developerType.ToString());
+        //if (SDKClientUtilities.IsInternalSDK())
+        //    EditorGUILayout.LabelField("Developer Status: ", APIUser.CurrentUser.developerType.ToString());
 
         EditorGUILayout.BeginHorizontal();
 
@@ -360,7 +366,6 @@ public partial class VRCSdkControlPanel : EditorWindow
         const int ENTER_2FA_CODE_MIN_WINDOW_WIDTH = ENTER_2FA_CODE_VERIFY_BUTTON_WIDTH + ENTER_2FA_CODE_ENTRY_REGION_WIDTH + (ENTER_2FA_CODE_BORDER_SIZE * 3);
 
         bool isValidAuthenticationCode = IsValidAuthenticationCodeFormat();
-        bool isValidRecoveryCode = IsValidRecoveryCodeFormat();
 
 
         // Invalid code text
@@ -544,7 +549,6 @@ public partial class VRCSdkControlPanel : EditorWindow
             },
             delegate (ApiModelContainer<API2FA> c)
             {
-                API2FA model2FA = c.Model as API2FA;
                 if (c.Cookies.ContainsKey("auth"))
                     ApiCredentials.Set(username, username, "vrchat", c.Cookies["auth"]);
                 showTwoFactorAuthenticationEntry = true;
